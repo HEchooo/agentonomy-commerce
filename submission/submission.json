@@ -1,0 +1,10 @@
+{
+  "schemaVersion": 1,
+  "name": "Agentonomy Commerce",
+  "slug": "hechooo-agentonomy-commerce",
+  "sourceRepository": "https://github.com/HEchooo/agentonomy-commerce",
+  "reviewCommit": "PENDING_REVIEW_COMMIT",
+  "apiBaseUrl": null,
+  "healthCheckUrl": null,
+  "deploymentProofUrl": null
+}

@@ -59,13 +59,13 @@ METHODS = {
 
 
 class MarketplaceBridge:
-    def __init__(self, state_dir: Path):
+    def __init__(self, state_dir: Path, *, worker_module="examples.commerce.market_worker", worker_args=()):
         env = {key: value for key, value in os.environ.items()
                if key in {'PATH', 'SYSTEMROOT', 'TMPDIR', 'LANG', 'LC_ALL'}}
         env['PYTHONPATH'] = str(ROOT)
         env['PYTHONUNBUFFERED'] = '1'
         self.process = subprocess.Popen(
-            [sys.executable, '-m', 'examples.commerce.market_worker', str(state_dir)],
+            [sys.executable, '-m', worker_module, str(state_dir), *worker_args],
             cwd=ROOT, env=env, stdin=subprocess.PIPE, stdout=subprocess.PIPE,
             stderr=sys.stderr, bufsize=-1,
         )

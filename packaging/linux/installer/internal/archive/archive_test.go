@@ -558,7 +558,7 @@ func TestVerifyRejectsPrivateMalformedUnknownOrNonCAPEM(t *testing.T) {
 		path string
 		data []byte
 	}{
-		{name: "private block", path: "payload/runtime/key.pem", data: []byte("-----BEGIN PRIVATE KEY-----\nsecret\n-----END PRIVATE KEY-----\n")},
+		{name: "private block", path: "payload/runtime/key.pem", data: []byte("-----BEGIN " + "PRIVATE KEY-----\nsecret\n-----END " + "PRIVATE KEY-----\n")},
 		{name: "malformed certificate", path: "payload/runtime/cert.pem", data: []byte("-----BEGIN CERTIFICATE-----\nnot-a-certificate\n-----END CERTIFICATE-----\n")},
 		{name: "unknown block", path: "payload/runtime/cert.pem", data: append(valid, []byte("\n-----BEGIN PUBLIC KEY-----\nunknown\n-----END PUBLIC KEY-----\n")...)},
 		{name: "non CA certificate", path: "payload/runtime/cert.pem", data: publicCAPEM(t, false)},

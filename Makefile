@@ -124,7 +124,7 @@ prediction-markets-regression:
 		$(PYTHON_ABS) "scripts/$$script"; \
 	done
 
-.PHONY: demo commerce-mcp test-commerce
+.PHONY: demo commerce-mcp test-commerce test-review test-submission review-api
 
 demo:
 	@$(PYTHON) -m examples.commerce.demo
@@ -136,3 +136,13 @@ test-commerce:
 	PYTHONPATH=. $(PYTHON) -m pytest -q tests/commerce/test_core_bridge.py
 	PYTHONPATH=.:apps/marketplace $(PYTHON) -m pytest -q tests/commerce/test_purchase_loop.py
 	PYTHONPATH=.:apps/node:apps/core $(PYTHON) -m pytest -q tests/commerce/test_mcp_contract.py tests/commerce/test_node_transport.py tests/commerce/test_mcp_e2e.py
+
+review-api:
+	@$(PYTHON) -m agentonomy_commerce.api
+
+test-review:
+	PYTHONPATH=. $(PYTHON) -m pytest -q tests/commerce/test_core_persistence.py tests/commerce/test_review_storage.py tests/commerce/test_review_api.py tests/commerce/test_review_verifier.py
+	PYTHONPATH=.:apps/marketplace $(PYTHON) -m pytest -q tests/commerce/test_review_merchant.py tests/commerce/test_review_restart.py
+
+test-submission:
+	PYTHONPATH=. $(PYTHON) -m pytest -q tests/commerce/test_submission_package.py

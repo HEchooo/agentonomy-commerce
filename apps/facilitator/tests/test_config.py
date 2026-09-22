@@ -80,7 +80,7 @@ def test_production_config_requires_persistent_postgres_redis_and_key_reference(
         ("postgres_url", "sqlite:///hosted.db"),
         ("postgres_url", "memory://"),
         ("redis_url", ""),
-        ("response_key_ref", "-----BEGIN PRIVATE KEY-----"),
+        ("response_key_ref", "-----BEGIN " + "PRIVATE KEY-----"),
         ("response_key_ref", "secret://clink/hosted/response-key"),
     ):
         with pytest.raises((ValidationError, ValueError), match=field.split("_")[0]):

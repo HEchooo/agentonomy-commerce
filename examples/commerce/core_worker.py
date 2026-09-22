@@ -42,6 +42,14 @@ def _clean_environment() -> None:
 
 _clean_environment()
 sys.path.insert(0, str(CORE_ROOT))
+sys.path.insert(0, str(ROOT))
+
+from examples.commerce.core_persistence import (  # noqa: E402
+    CorePersistenceError,
+    PersistentCoreState,
+    SettlementJournal,
+    StateLock,
+)
 
 from eth_account import Account  # noqa: E402
 from eth_account._utils.legacy_transactions import Transaction  # noqa: E402
@@ -192,11 +200,16 @@ class ApprovalRpc:
 class SettlementRpc:
     """Local RPC fixture which records and deterministically mines one transfer."""
 
-    def __init__(self, payer: str) -> None:
+    def __init__(self, payer: str, *, journal: SettlementJournal | None = None) -> None:
         self.payer = payer
+        self._journal = journal
         self.sent_networks: list[str] = []
         self.receipts: dict[str, dict[str, Any]] = {}
         self.transactions: dict[str, dict[str, Any]] = {}
+        if journal is not None:
+            self.sent_networks = journal.sent_networks
+            self.receipts = journal.receipts
+            self.transactions = journal.transactions
 
     @property
     def submission_count(self) -> int:
@@ -229,15 +242,14 @@ class SettlementRpc:
             destination = "0x" + decoded.data[4 + 32 + 12 : 4 + 64].hex()
             amount = int.from_bytes(decoded.data[4 + 64 : 4 + 96], "big")
             token = "0x" + decoded.to.hex()
-            self.sent_networks.append(network)
-            self.transactions[transaction_hash] = {
+            transaction = {
                 "hash": transaction_hash,
                 "from": Account.recover_transaction(raw),
                 "nonce": hex(decoded.nonce),
                 "to": token,
                 "input": input_data,
             }
-            self.receipts[transaction_hash] = {
+            receipt = {
                 "transactionHash": transaction_hash,
                 "status": "0x1",
                 "blockNumber": "0x20",
@@ -253,6 +265,18 @@ class SettlementRpc:
                     }
                 ],
             }
+            if transaction_hash in self.transactions:
+                return transaction_hash
+            if self._journal is not None:
+                self._journal.record(
+                    network,
+                    transaction_hash,
+                    transaction,
+                    receipt,
+                )
+            self.sent_networks.append(network)
+            self.transactions[transaction_hash] = transaction
+            self.receipts[transaction_hash] = receipt
             return transaction_hash
         if not params:
             raise AssertionError(f"missing transaction hash for {method}")
@@ -267,10 +291,35 @@ class SettlementRpc:
 class CoreRuntime:
     """Real Core service composition owned by one worker process."""
 
-    def __init__(self, state_dir: Path) -> None:
+    def __init__(
+        self,
+        state_dir: Path,
+        *,
+        persistent: bool = False,
+    ) -> None:
         self.state_dir = state_dir.expanduser().resolve()
         self.state_dir.mkdir(parents=True, exist_ok=True)
-        database_url = f"sqlite+pysqlite:///{self.state_dir / 'core.sqlite3'}"
+        self.persistent = persistent
+        self._state_lock: StateLock | None = None
+        self._persistent_state: PersistentCoreState | None = None
+        database_path = self.state_dir / "core.sqlite3"
+        if persistent:
+            self._persistent_state = PersistentCoreState(
+                self.state_dir,
+                database_path,
+            )
+            self._state_lock = StateLock(self.state_dir)
+            self._state_lock.acquire()
+            self._persistent_state.prepare()
+        database_url = f"sqlite+pysqlite:///{database_path}"
+
+        receipt_signing_key = (
+            self._persistent_state.receipt_secret
+            if self._persistent_state is not None
+            else RECEIPT_SIGNING_KEY
+        )
+        if not receipt_signing_key:
+            raise CorePersistenceError("persistent Core receipt secret is unavailable")
 
         self.config = AppConfig(
             funding_database_url=database_url,
@@ -291,13 +340,24 @@ class CoreRuntime:
             x402_payment_network=POLYGON,
             x402_payment_token="USDC",
             x402_payment_token_address=POLYGON_TOKEN,
-            clink_receipt_signing_key=RECEIPT_SIGNING_KEY,
+            clink_receipt_signing_key=receipt_signing_key,
             native_min_confirmations=1,
         )
 
-        self.wallet = Account.create()
+        persisted_metadata = (
+            self._persistent_state.metadata
+            if self._persistent_state is not None
+            else None
+        )
+        self.wallet = None
+        self.wallet_address = (
+            persisted_metadata["wallet_address"] if persisted_metadata else ""
+        )
+        if persisted_metadata is None:
+            self.wallet = Account.create()
+            self.wallet_address = self.wallet.address
         self.repository = AccountRepository(database_url)
-        self.approval_rpc = ApprovalRpc(self.wallet.address)
+        self.approval_rpc = ApprovalRpc(self.wallet_address)
         self.account_service = AccountService(
             self.repository,
             domain="account.agentonomy-commerce.local",
@@ -306,7 +366,27 @@ class CoreRuntime:
             network_configs=_network_configs(),
             allowed_products=set(self.config.account_allowed_products),
         )
-        self.wallet_identity, self.grant, self.allowance = self._create_signed_authorization()
+        if persisted_metadata is None:
+            self.wallet_identity, self.grant, self.allowance = (
+                self._create_signed_authorization()
+            )
+            if self._persistent_state is not None:
+                self._persistent_state.save_metadata(
+                    {
+                        "version": 1,
+                        "wallet_address": self.wallet_address,
+                        "wallet_identity_id": self.wallet_identity.wallet_identity_id,
+                        "spending_grant_id": self.grant.spending_grant_id,
+                        "asset_allowance_id": self.allowance.asset_allowance_id,
+                        "user_id": USER_ID,
+                        "agent_id": AGENT_ID,
+                        "grant_expires_at": self.grant.expires_at.isoformat(),
+                    }
+                )
+        else:
+            self.wallet_identity, self.grant, self.allowance = (
+                self._load_persisted_authorization(persisted_metadata)
+            )
 
         self.action_service = ActionService(config=self.config)
         self.policy_service = PolicyService(
@@ -318,7 +398,15 @@ class CoreRuntime:
             storage_file=self.state_dir / "audit.jsonl",
             clock=lambda: datetime.now(UTC),
         )
-        self.settlement_rpc = SettlementRpc(self.wallet.address)
+        settlement_journal = (
+            self._persistent_state.settlement_journal()
+            if self._persistent_state is not None
+            else None
+        )
+        self.settlement_rpc = SettlementRpc(
+            self.wallet_address,
+            journal=settlement_journal,
+        )
         self.funding_service = FundingService(
             config=self.config,
             storage_file=self.state_dir / "funding.jsonl",
@@ -326,7 +414,52 @@ class CoreRuntime:
             policy_service=self.policy_service,
         )
 
+    def _load_persisted_authorization(
+        self, metadata: dict[str, Any]
+    ) -> tuple[Any, Any, Any]:
+        identity = self.repository.wallet_identity(metadata["wallet_identity_id"])
+        grant = self.repository.spending_grant(metadata["spending_grant_id"])
+        allowance = self.repository.asset_allowance(metadata["asset_allowance_id"])
+        if identity is None or grant is None or allowance is None:
+            raise CorePersistenceError(
+                "persistent Core metadata references missing authorization state"
+            )
+        if identity.wallet_address.lower() != metadata["wallet_address"].lower():
+            raise CorePersistenceError(
+                "persistent Core wallet identity does not match metadata"
+            )
+        if identity.user_id != metadata["user_id"]:
+            raise CorePersistenceError(
+                "persistent Core wallet identity user does not match metadata"
+            )
+        if grant.wallet_identity_id != identity.wallet_identity_id:
+            raise CorePersistenceError(
+                "persistent Core spending grant does not match wallet identity"
+            )
+        if grant.user_id != metadata["user_id"] or grant.agent_id != metadata["agent_id"]:
+            raise CorePersistenceError(
+                "persistent Core spending grant scope does not match metadata"
+            )
+        if allowance.wallet_identity_id != identity.wallet_identity_id:
+            raise CorePersistenceError(
+                "persistent Core asset allowance does not match wallet identity"
+            )
+        try:
+            expected_expiry = datetime.fromisoformat(metadata["grant_expires_at"])
+        except (TypeError, ValueError) as exc:
+            raise CorePersistenceError("persistent Core grant expiry is invalid") from exc
+        if grant.expires_at.astimezone(UTC) != expected_expiry.astimezone(UTC):
+            raise CorePersistenceError(
+                "persistent Core spending grant expiry does not match metadata"
+            )
+        return identity, grant, allowance
+
     def _create_signed_authorization(self):
+        if self.wallet is None:
+            raise CorePersistenceError(
+                "persistent Core cannot create authorization without a wallet signer"
+            )
+        wallet = self.wallet
         now = datetime.now(UTC)
         public_session = self.repository.create_public_account_session(
             PublicAccountSession(
@@ -343,12 +476,12 @@ class CoreRuntime:
         )
         wallet_challenge = self.account_service.create_wallet_challenge(
             USER_ID,
-            self.wallet.address,
+            wallet.address,
             created_by_public_account_session_id=public_session.public_account_session_id,
         )
         wallet_signature = Account.sign_message(
             encode_defunct(text=wallet_challenge.message_to_sign),
-            self.wallet.key,
+            wallet.key,
         ).signature.hex()
         identity = self.account_service.verify_wallet_challenge(
             wallet_challenge.session_id,
@@ -372,14 +505,14 @@ class CoreRuntime:
             network_scopes=[POLYGON],
             asset_scopes=[POLYGON_TOKEN],
             starts_at=now - timedelta(minutes=1),
-            expires_at=now + timedelta(days=1),
+            expires_at=now + timedelta(days=30 if self.persistent else 1),
         )
         grant_challenge = self.account_service.create_spending_grant_challenge(
             unsigned_grant
         )
         grant_signature = Account.sign_message(
             encode_defunct(text=grant_challenge.message_to_sign),
-            self.wallet.key,
+            wallet.key,
         ).signature.hex()
         grant = self.account_service.create_spending_grant(
             unsigned_grant.model_copy(
@@ -497,9 +630,11 @@ class CoreRuntime:
         return {
             "user_id": USER_ID,
             "agent_id": AGENT_ID,
+            "wallet_address": self.wallet_address,
             "wallet_identity_id": self.wallet_identity.wallet_identity_id,
             "grant_id": grant.spending_grant_id,
             "grant_status": grant.status,
+            "grant_expires_at": grant.expires_at.isoformat(),
             "budget_usdc": _money(grant.max_amount_usdc),
             "used_amount_usdc": _money(grant.used_amount_usdc),
             "reserved_amount_usdc": _money(grant.reserved_amount_usdc),
@@ -510,7 +645,7 @@ class CoreRuntime:
             "resource": RESOURCE,
             "spender_address": SPENDER,
             "settlement_submissions": self.settlement_rpc.submission_count,
-            "receipt_signing_key": RECEIPT_SIGNING_KEY,
+            "receipt_signing_key": self.config.clink_receipt_signing_key,
             "simulation": True,
             "simulation_label": SIMULATION_LABEL,
         }
@@ -531,7 +666,7 @@ class CoreRuntime:
         if receipt.get("status") != "0x1":
             raise RuntimeError("simulation settlement receipt is unsuccessful")
         expected_token = str(result["token_address"]).lower()
-        expected_owner = self.wallet.address.lower()
+        expected_owner = self.wallet_address.lower()
         expected_destination = str(result["destination"]).lower()
         expected_amount = int(result["amount_atomic"])
         matching_logs = []
@@ -563,6 +698,11 @@ class CoreRuntime:
                 "transfer_log_verified": True,
             },
         }
+
+    def close(self) -> None:
+        if self._state_lock is not None:
+            self._state_lock.release()
+            self._state_lock = None
 
 
 METHODS = {
@@ -618,22 +758,34 @@ def _response(request: dict[str, Any], *, result: Any = None, error: Exception |
 
 
 def main() -> None:
-    if len(sys.argv) != 2:
+    persistent = "--persistent" in sys.argv[1:]
+    arguments = [argument for argument in sys.argv[1:] if argument != "--persistent"]
+    if len(arguments) != 1:
         raise SystemExit("state directory argument is required")
-    runtime = CoreRuntime(Path(sys.argv[1]))
-    for line in sys.stdin:
-        if not line.strip():
-            continue
-        request: dict[str, Any] = {}
-        try:
-            request = json.loads(line)
-            params = request.get("params")
-            if params is None:
-                params = request.get("arguments", {})
-            result = _dispatch(runtime, request["method"], params)
-            print(_response(request, result=result), flush=True)
-        except Exception as exc:
-            print(_response(request, error=exc), flush=True)
+    try:
+        runtime = CoreRuntime(
+            Path(arguments[0]),
+            persistent=persistent,
+        )
+    except Exception as exc:
+        print(_response({}, error=exc), flush=True)
+        raise SystemExit(1) from exc
+    try:
+        for line in sys.stdin:
+            if not line.strip():
+                continue
+            request: dict[str, Any] = {}
+            try:
+                request = json.loads(line)
+                params = request.get("params")
+                if params is None:
+                    params = request.get("arguments", {})
+                result = _dispatch(runtime, request["method"], params)
+                print(_response(request, result=result), flush=True)
+            except Exception as exc:
+                print(_response(request, error=exc), flush=True)
+    finally:
+        runtime.close()
 
 
 if __name__ == "__main__":

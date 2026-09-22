@@ -38,3 +38,45 @@ signature, mandate, allowance and budget checks.
 The local MCP test demonstrates a signed `silent_under_limits` grant purchasing
 without per-purchase confirmation. Six focused regression cases cover the
 handoff, including fail-closed handling of unknown values.
+
+## Persistent HTTP review composition
+
+`agentonomy_commerce.api` serves a single authenticated review tenant and a
+browser walkthrough. Its bounded subprocess bridge runs the Marketplace
+composition separately from Core, preserving their existing module namespaces.
+There is no API for selecting a wallet, changing a price, granting more budget,
+resetting an order, or choosing an arbitrary merchant URL.
+
+Browser / API client → authenticated API → Marketplace worker → persistent Core
+worker → simulated RPC settlement → real loopback HTTP merchant → CSV report.
+
+The bootstrap signs one 1.00 sandbox USDC grant for 30 days. The wallet signing
+key is used in memory for setup and is not persisted. Core's SQLite identity,
+grant, reservations and audit, a protected receipt HMAC secret, public bootstrap
+metadata and a simulated transaction journal survive process restarts. A
+single-owner lock prevents concurrent Core instances. Incomplete or corrupt
+state fails startup; expiry and revocation never trigger a replacement grant.
+
+Marketplace freezes the CSV input and 0.30 price in a five-minute preview.
+`Idempotency-Key` binds repeated preview requests to the same input. An existing
+preview/purchase is replayed through the production state machine, preserving
+settlement identity. A seven-day SQLite result mailbox and the merchant's own
+idempotency ledger preserve delivery evidence across restarts. Expired merchant
+results leave tombstones, so replay cannot compute a new delivery under the
+same expired order. Reads purge expired payloads; metadata and audit remain.
+
+The catalog keeps a fixed logical HTTPS identity,
+`https://merchant.agentonomy.invalid/v1/reconcile`, to retain the imported
+public-endpoint model constraints. A dedicated transport maps **only this
+fixed resource** to `http://127.0.0.1:<merchant-port>/v1/reconcile` using a real
+HTTP socket. The `.invalid` address is not a public deployment. The merchant
+checks the Core-signed purchase scope, receipt signature, settled state, price,
+network and payee. It resolves the signed purchase ID to Marketplace's stored
+input hash before accepting the CSV body. The Agent cannot choose this mapping.
+
+All public capability responses disclose `real_funds: false`,
+`settlement_mode: simulated` and `service_transport: http`. The health/proof
+commit is a deployment configuration claim; independent source/build/endpoint
+checks are required before treating it as public deployment evidence. The
+container smoke check binds it to the build commit and exercises purchase and
+replay across a container restart.

@@ -11,7 +11,6 @@ import sys
 import threading
 from typing import Any
 
-
 ROOT = Path(__file__).resolve().parents[2]
 WORKER = ROOT / "examples" / "commerce" / "core_worker.py"
 
@@ -19,17 +18,27 @@ WORKER = ROOT / "examples" / "commerce" / "core_worker.py"
 class CoreBridge:
     """Expose the Core service composition without importing Core in Marketplace."""
 
-    def __init__(self, state_dir: Path):
+    def __init__(self, state_dir: Path, *, persistent: bool = False):
         self.state_dir = Path(state_dir).expanduser().resolve()
         self.state_dir.mkdir(parents=True, exist_ok=True)
+        self.persistent = persistent
         self.process: subprocess.Popen[str] | None = None
         self._lock = threading.Lock()
         self._next_id = 0
         self._broken: str | None = None
 
     def __enter__(self) -> "CoreBridge":
-        self._start()
-        return self
+        try:
+            self._start()
+            if self.persistent:
+                # Persistent startup errors are reported by the worker before it
+                # accepts requests, so a context cannot expose half-initialized
+                # state to its caller.
+                self._call("health")
+            return self
+        except Exception:
+            self.close()
+            raise
 
     def __exit__(self, _exc_type, _exc_value, _traceback) -> None:
         self.close()
@@ -43,8 +52,11 @@ class CoreBridge:
         env = {key: value for key, value in os.environ.items() if key in safe_keys}
         env["PYTHONPATH"] = str(ROOT / "apps" / "core")
         env["PYTHONUNBUFFERED"] = "1"
+        arguments = [sys.executable, str(WORKER), str(self.state_dir)]
+        if self.persistent:
+            arguments.append("--persistent")
         self.process = subprocess.Popen(
-            [sys.executable, str(WORKER), str(self.state_dir)],
+            arguments,
             cwd=ROOT,
             env=env,
             stdin=subprocess.PIPE,
@@ -106,6 +118,15 @@ class CoreBridge:
                 self._mark_broken(message)
                 raise RuntimeError(message) from exc
             if response.get("id") != request["id"]:
+                if response.get("id") is None and response.get("ok") is False:
+                    error = response.get("error") or {}
+                    message = (
+                        error.get("message")
+                        if isinstance(error, dict)
+                        else str(error)
+                    ) or "local Core worker failed to start"
+                    self._mark_broken(message)
+                    raise RuntimeError(message)
                 message = "local Core worker returned a mismatched request id"
                 self._mark_broken(message)
                 raise RuntimeError(message)
