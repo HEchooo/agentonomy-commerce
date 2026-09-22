@@ -1,0 +1,33 @@
+name: Commerce validation
+on:
+  push:
+  pull_request:
+permissions:
+  contents: read
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: packaging/linux/installer/go.mod
+      - uses: foundry-rs/foundry-toolchain@v1
+      - name: Install dependencies
+        run: |
+          python3 -m pip install -r requirements.lock
+          python3 -m pip install --no-deps -e apps/node
+      - run: make doctor
+      - run: make test-workspace
+      - run: make test-node
+      - run: make test-e2e
+      - run: make test-apps
+      - run: make test-hosted
+      - run: make test-commerce
+      - run: make demo
+      - run: make test-go
+      - run: make test-contracts
+      - run: python3 -m compileall -q apps examples scripts tests
