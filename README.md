@@ -29,44 +29,54 @@ expected evidence and simulated boundaries.
 
 ## Persistent review service
 
-The review API adds a browser walkthrough and a **real HTTP CSV reconciliation
-merchant**. It uses the same Core authorization and Marketplace purchase logic.
-Settlement is explicitly simulated: each report costs 0.30 sandbox USDC from a
-1.00 sandbox USDC budget. No real funds are spent.
+The review API provides a **real HTTP CSV reconciliation merchant** over the
+same Core authorization and Marketplace purchase logic. Settlement is explicitly
+simulated: each report costs 0.30 simulated USDC from a 1.00 simulated USDC
+budget. No real funds are spent.
 
-Follow [deployment instructions](docs/deployment.md) to launch the authenticated
-API locally or build its container. The browser at `/` walks through quote,
-purchase, result lookup, and replay. Health and version declarations are public;
-all `/v1/` capabilities require a private review token.
+Follow [deployment instructions](docs/deployment.md) to launch the service
+locally or build its container. When `AGENTONOMY_DEMO_ORIGIN` is set to the
+exact browser origin, opening `/` and clicking **开始演示** creates or restores
+an HttpOnly `agentonomy_demo` visitor session. The browser uses
+`/demo/session` and `/demo/v1/*`; visitors do not enter or retrieve a review
+token. Each visitor has an isolated persistent 1.00 simulated USDC budget,
+with 0.30 charged per delivered report. A session lasts seven days; at most
+128 sessions are retained and at most 10 new sessions are created per rolling
+minute. Refreshing the page or replaying a purchase reuses the same persisted
+session and never recharges or resets its budget.
+
+The private machine API remains separate: `/v1/` capabilities still require
+the private Bearer review token, and its original persistent review tenant,
+budget and order state are not shared with public visitor sessions. The local
+public demo is disabled unless its exact origin is configured; for Compose or
+the direct local launch, use `http://localhost:8080`.
 
 State persists across restarts. Replaying a purchase preserves its settlement
 and result instead of charging again. Reports are retained for seven days;
-the signed bootstrap grant expires after 30 days and is never automatically
-replaced. This is one shared review tenant, not a multiuser wallet service.
+the private tenant's signed bootstrap grant expires after 30 days and is never
+automatically replaced. These are simulated sessions and simulated settlement,
+not a multiuser production wallet service.
 
 ```sh
 make PYTHON=.venv/bin/python test-review test-submission
 ```
 
 The original stdio MCP demo above is independent and ephemeral. It does not
-share the review API's budget or CSV service. The full shipped `clink_node`
-runtime remains the Agent entry for Core and Marketplace.
+share the private review tenant, public visitor sessions or CSV service. The
+full shipped `clink_node` runtime remains the Agent entry for Core and
+Marketplace.
 
 ## Hackathon submission
 
-[Submission preparation](submission/README.md) describes the official folder
-structure and outstanding owner inputs. The package command exports committed
-source with a SHA-256 manifest and reports missing evidence explicitly:
+The official submission is [PR #83](https://github.com/xagentAI/xagt-plugin/pull/83).
+Its package contains an exact committed source snapshot, SHA-256 manifest,
+rights declaration and deployment evidence. The public review site is
+[review.agentonomy.xyz](https://review.agentonomy.xyz).
 
-```sh
-.venv/bin/python scripts/package_submission.py \
-  --output .artifacts/submissions/mcp-hackathon/hechooo-agentonomy-commerce
-```
-
-This creates a **blocked draft**, not an official submission. Public HTTPS
-deployment, submitter identity/rights, review access and eligibility after the
-announced deadline still need owner confirmation. No public deployment or
-blockchain settlement is implied by local tests.
+[Submission preparation](submission/README.md) documents the packaging format.
+`scripts/package_submission.py --output DIR` deliberately creates a draft;
+publication requires fresh deployment and validation evidence for the selected
+commit. A submission PR is not an acceptance decision.
 
 See the [two-minute review walkthrough](docs/review-walkthrough.md) for the
 demo sequence and the exact boundaries of each claim.

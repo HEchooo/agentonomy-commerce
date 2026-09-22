@@ -331,7 +331,8 @@ def _render_submission(
 
 - **API base URL:** {api_value}
 - **Health-check URL:** {health_value}
-- **Authentication:** Bearer token supplied through an approved private review channel; no token is committed.
+- **Browser access:** When AGENTONOMY_DEMO_ORIGIN is configured, open the site and click “开始演示”. No manual token or registration is required; an HttpOnly cookie identifies an isolated visitor sandbox with 1.00 simulated USDC. Session lifetime is 7 days, up to 128 sessions and 10 new sessions/minute.
+- **Operator API:** `/v1` retains private Bearer authentication; the browser uses `/demo/session` and `/demo/v1` with a same-origin cookie. No credential is committed.
 - **Rate limits / known limits:** 60 authenticated requests per minute by default; 256 KiB maximum HTTP body; 128 KiB maximum UTF-8 CSV; at most 1,000 rows including duplicates; one three-letter currency per CSV; each amount must be a two-place decimal with absolute value at most 1,000,000,000,000; 0.30 sandbox USDC per delivered report; 1.00 sandbox USDC initial budget; signed bootstrap grant valid for 30 days; previews expire after 300 seconds; result payloads are retained for 7 days; the SQLite review state and settlement journal persist across restart.
 - **API contract:** `GET /health` and `GET /.well-known/xagent-verification.json` are public. Bearer-authenticated `GET /v1/services`, `GET /v1/budget`, `POST /v1/previews` (JSON `{{\"offering_id\":\"csv-reconciliation-v1\",\"csv_text\":\"...\"}}` plus an `Idempotency-Key` header), `POST /v1/purchases` (JSON `{{\"preview_id\":\"...\"}}`), and `GET /v1/purchases/{{purchase_id}}` are implemented in `source/`.
 

@@ -8,6 +8,7 @@ services:
         SOURCE_COMMIT: ${SOURCE_COMMIT:?SOURCE_COMMIT must be set to the exact 40-character source commit}
     environment:
       AGENTONOMY_API_TOKEN: ${AGENTONOMY_API_TOKEN:?AGENTONOMY_API_TOKEN must be set}
+      AGENTONOMY_DEMO_ORIGIN: ${AGENTONOMY_DEMO_ORIGIN:-}
       AGENTONOMY_STATE_DIR: /data
       AGENTONOMY_PROJECT_SLUG: hechooo-agentonomy-commerce
       AGENTONOMY_HOST: 0.0.0.0

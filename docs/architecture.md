@@ -41,8 +41,16 @@ handoff, including fail-closed handling of unknown values.
 
 ## Persistent HTTP review composition
 
-`agentonomy_commerce.api` serves a single authenticated review tenant and a
-browser walkthrough. Its bounded subprocess bridge runs the Marketplace
+`agentonomy_commerce.api` serves isolated public visitor sessions alongside a
+private operator review tenant. Each browser receives an HttpOnly cookie after
+clicking Start demo; only its credential hash is persisted. Public `/demo/v1`
+requests select the server-owned sandbox path for that session; private `/v1`
+requests retain Bearer authentication and separate state. Mutating public calls
+require an exact configured Origin. A single additional guest worker is closed
+before switching visitors and reopens the original persisted budget and orders.
+Sessions expire after seven days; refresh never replaces a valid grant.
+
+The bounded subprocess bridge runs the Marketplace
 composition separately from Core, preserving their existing module namespaces.
 There is no API for selecting a wallet, changing a price, granting more budget,
 resetting an order, or choosing an arbitrary merchant URL.

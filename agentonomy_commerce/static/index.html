@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="description" content="让 Agent 在用户授权预算内，可靠地购买服务并取得结果。">
+  <meta name="description" content="在独立访客演示预算内，让 Agent 可靠地购买服务并取得结果。">
   <title>Agentonomy Commerce · 购买验收</title>
   <link rel="stylesheet" href="/assets/style.css">
   <script src="/assets/app.js" defer></script>
@@ -14,29 +14,33 @@
     <main>
       <section class="intro">
         <p class="eyebrow">AGENT COMMERCE, WITH A RECEIPT.</p>
-        <h1>授权一笔预算，<br>交付一个结果。</h1>
-        <p class="lead">从锁定报价到收取报告，完整验证一次 Agent 服务购买。预算由 Core 控制，每次购买都留下可查询的凭证。</p>
-        <p class="notice">本页执行真实 HTTP 服务计算，链上结算为模拟。不会花费真实资金。仅使用合成示例数据。</p>
+        <h1>开始一次演示，<br>交付一个结果。</h1>
+        <p class="lead">从锁定报价到收取报告，完整验证一次 Agent 服务购买。每个浏览器会话都有独立预算，每次购买都留下可查询的凭证。</p>
+        <p class="notice">本页执行真实 HTTP 服务计算，结算使用 1.00 模拟 USDC。无需注册，不会花费真实资金。仅使用合成示例数据。</p>
       </section>
       <section class="connection panel" aria-labelledby="connection-title">
-        <div><p class="eyebrow">01 / CONNECT</p><h2 id="connection-title">连接验收环境</h2><p>访问令牌仅保留在当前页面内存中。此环境共用一份预算。</p></div>
-        <div class="token-row"><label for="token">验收访问令牌</label><div class="inline"><input id="token" type="password" autocomplete="off" spellcheck="false" placeholder="输入部署时配置的令牌"><button id="connect" class="secondary">连接</button></div></div>
+        <div><p class="eyebrow">01 / START DEMO</p><h2 id="connection-title">开始访客演示</h2><p>点击后创建当前浏览器的独立演示会话，获得 1.00 模拟 USDC 预算。无需注册，也不会使用真实资金。</p></div>
+        <div class="start-row"><button id="start-demo" disabled>开始演示</button><p id="session-note" class="hint" aria-live="polite">正在检查演示服务…</p></div>
       </section>
       <div class="workbench">
         <section class="panel composer" aria-labelledby="service-title">
           <p class="eyebrow">02 / PREVIEW & PURCHASE</p><div class="service-heading"><h2 id="service-title">CSV 收支核对</h2><span class="price">0.30 <small>模拟 USDC / 次</small></span></div>
           <p>核对重复交易，汇总收入、支出与分类净额。相同交易 ID、内容完全一致的记录只计一次；冲突记录会被拒绝。</p>
           <div class="field-heading"><label for="csv">交易明细 CSV</label><button id="sample" class="text-button">载入合成示例</button></div>
-          <textarea id="csv" spellcheck="false" rows="10" aria-describedby="csv-help" placeholder="transaction_id,date,description,amount,currency,category"></textarea>
+          <textarea id="csv" spellcheck="false" rows="10" aria-describedby="csv-help" placeholder="transaction_id,date,description,amount,currency,category">transaction_id,date,description,amount,currency,category
+demo-001,2026-09-01,Synthetic hosting,-12.50,USD,software
+demo-002,2026-09-02,Synthetic invoice,40.00,USD,revenue
+demo-001,2026-09-01,Synthetic hosting,-12.50,USD,software
+</textarea>
           <p id="csv-help" class="hint">最多 1,000 行 · 单一币种 · 金额保留两位小数 · 不上传个人账单</p>
           <div class="actions"><button id="preview" class="secondary" disabled>锁定报价</button><button id="purchase" disabled>确认购买 · 0.30 模拟 USDC</button></div>
-          <p id="preview-note" class="hint">先连接环境，再锁定报价。报价有效期为 5 分钟。</p>
+          <p id="preview-note" class="hint">开始演示后即可锁定报价。报价有效期为 5 分钟。</p>
         </section>
         <aside class="panel budget" aria-labelledby="budget-title">
-          <p class="eyebrow">SPENDING MANDATE</p><h2 id="budget-title">授权预算</h2><p class="budget-number"><span id="remaining">—</span><small>模拟 USDC 可用</small></p>
+          <p class="eyebrow">VISITOR BUDGET</p><h2 id="budget-title">本次演示预算</h2><p class="budget-number"><span id="remaining">—</span><small>模拟 USDC 可用</small></p>
           <dl><div><dt>已使用</dt><dd id="used">—</dd></div><div><dt>结算次数</dt><dd id="settlements">—</dd></div><div><dt>已交付订单</dt><dd id="deliveries">—</dd></div></dl>
           <button id="refresh" class="text-button" disabled>刷新预算 ↗</button>
-          <p class="hint">初始预算 1.00 模拟 USDC。重启保留预算与订单，刷新页面不会重置额度。</p>
+          <p class="hint">本次访客会话从 1.00 模拟 USDC 开始。刷新页面会恢复当前会话和订单，不会自动购买或重置额度。</p>
         </aside>
       </div>
       <div id="status" class="status" role="status" aria-live="polite">等待连接。</div>

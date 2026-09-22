@@ -12,7 +12,7 @@
 
 - **API base URL:** `PENDING_OWNER_INPUT` (the public root origin, without `/v1`).
 - **Health-check URL:** `PENDING_OWNER_INPUT`.
-- **Authentication:** Short-lived bearer access supplied through an approved private review channel; no token belongs in Git.
+- **Browser access:** Configure `AGENTONOMY_DEMO_ORIGIN` and click **开始演示**. Each visitor receives an HttpOnly cookie and isolated persistent 1.00 simulated USDC; no manual token or registration is required. Sessions last seven days, with 128 total sessions and 10 new sessions/minute. Private operator `/v1` endpoints retain Bearer authentication; public visitor calls use `/demo/session` and `/demo/v1/*`.
 - **Rate limits / known limits:** 60 authenticated requests per minute by default; 256 KiB maximum HTTP body; 128 KiB maximum UTF-8 CSV; at most 1,000 rows including duplicates; one three-letter currency per CSV; each amount must be two-place decimal with absolute value at most 1,000,000,000,000; price 0.30 sandbox USDC per delivered report; initial budget 1.00 sandbox USDC; signed bootstrap grant valid for 30 days; previews expire after 300 seconds; result payloads are retained for 7 days; SQLite review state and the settlement journal persist across restart.
 - **API contract:** Public `GET /health` and `GET /.well-known/xagent-verification.json`; bearer-authenticated `GET /v1/services`, `GET /v1/budget`, `POST /v1/previews` with `{ "offering_id": "csv-reconciliation-v1", "csv_text": "..." }` and required `Idempotency-Key`, `POST /v1/purchases` with `{ "preview_id": "..." }`, and `GET /v1/purchases/{purchase_id}`.
 

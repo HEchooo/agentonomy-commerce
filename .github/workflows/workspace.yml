@@ -39,6 +39,7 @@ jobs:
     env:
       SOURCE_COMMIT: ${{ github.sha }}
       AGENTONOMY_API_TOKEN: review-ci-token-${{ github.run_id }}-local-only
+      AGENTONOMY_DEMO_ORIGIN: http://127.0.0.1:8080
       COMPOSE_PROJECT_NAME: agentonomy-review-${{ github.run_id }}
     steps:
       - uses: actions/checkout@v4
@@ -77,6 +78,12 @@ jobs:
                   raise SystemExit(f"missing {name}")
               print(f"{name}={value}")
           PY
+      - name: Verify public visitor isolation
+        run: |
+          python3 scripts/verify_public_demo.py \
+            --base-url http://127.0.0.1:8080 \
+            --expected-commit "$SOURCE_COMMIT" \
+            --state-file /tmp/agentonomy-public-private.json
       - name: Restart the same container and verify replay
         run: |
           set -euo pipefail
@@ -116,6 +123,12 @@ jobs:
           if not after_restart["restart_check"]["charge_unchanged"]:
               raise SystemExit("replay charged after restart")
           PY
+      - name: Verify public session after container restart
+        run: |
+          python3 scripts/verify_public_demo.py \
+            --base-url http://127.0.0.1:8080 \
+            --expected-commit "$SOURCE_COMMIT" \
+            --state-file /tmp/agentonomy-public-private.json --resume
       - name: Remove only this smoke test's resources
         if: always()
         run: docker compose down --volumes --remove-orphans

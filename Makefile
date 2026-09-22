@@ -141,7 +141,7 @@ review-api:
 	@$(PYTHON) -m agentonomy_commerce.api
 
 test-review:
-	PYTHONPATH=. $(PYTHON) -m pytest -q tests/commerce/test_core_persistence.py tests/commerce/test_review_storage.py tests/commerce/test_review_api.py tests/commerce/test_review_verifier.py
+	PYTHONPATH=. $(PYTHON) -m pytest -q tests/commerce/test_core_persistence.py tests/commerce/test_review_storage.py tests/commerce/test_review_api.py tests/commerce/test_demo_sessions.py tests/commerce/test_demo_api.py tests/commerce/test_review_verifier.py
 	PYTHONPATH=.:apps/marketplace $(PYTHON) -m pytest -q tests/commerce/test_review_merchant.py tests/commerce/test_review_restart.py
 
 test-submission:
