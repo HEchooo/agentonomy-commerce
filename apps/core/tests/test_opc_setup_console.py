@@ -9,7 +9,8 @@ from services.account_service.console import ACCOUNT_CONSOLE_JS
 def _run_node_assertion(expression: str) -> None:
     script = f"const accountConsole = {json.dumps(ACCOUNT_CONSOLE_JS)};\n{expression}"
     result = subprocess.run(
-        ["node", "--input-type=module", "-e", script],
+        ["node", "--input-type=module", "-"],
+        input=script,
         check=False,
         capture_output=True,
         text=True,

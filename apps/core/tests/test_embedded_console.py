@@ -559,7 +559,8 @@ if (scenario === "revoke-uncertain") {{
   console.log(JSON.stringify(result));
 """
     result = subprocess.run(
-        ["node", "--input-type=module", "-e", harness],
+        ["node", "--input-type=module", "-"],
+        input=harness,
         check=False,
         capture_output=True,
         text=True,

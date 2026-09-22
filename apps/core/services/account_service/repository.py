@@ -79,9 +79,13 @@ def sqlite_immediate_session(sessions, *, operation: str):
     assert session is not None
     try:
         yield session
+        session.flush()
+        connection = session.connection()
         for attempt in range(1, SQLITE_WRITE_RETRY_ATTEMPTS + 1):
             try:
-                session.commit()
+                # SQLite keeps a BUSY COMMIT transaction open for retry. An ORM
+                # commit failure instead invalidates SQLAlchemy's transaction.
+                connection.exec_driver_sql("COMMIT")
                 break
             except OperationalError as exc:
                 if "locked" not in str(exc).lower() and "busy" not in str(exc).lower():
@@ -89,6 +93,8 @@ def sqlite_immediate_session(sessions, *, operation: str):
                 if attempt == SQLITE_WRITE_RETRY_ATTEMPTS:
                     raise
                 time.sleep(SQLITE_WRITE_RETRY_DELAY_SECONDS * attempt)
+        # Finalize ORM state after the explicit SQLite transaction has committed.
+        session.commit()
     except Exception:
         session.rollback()
         raise

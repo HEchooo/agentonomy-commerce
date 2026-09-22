@@ -752,7 +752,8 @@ setTimeout(async () => {
 }, 20);
 """
     result = subprocess.run(
-        ["node", "-e", harness],
+        ["node", "-"],
+        input=harness,
         check=False,
         capture_output=True,
         text=True,
@@ -1844,7 +1845,8 @@ setTimeout(async () => {
 }, 20);
 """
     result = subprocess.run(
-        ["node", "-e", harness],
+        ["node", "-"],
+        input=harness,
         check=False,
         capture_output=True,
         text=True,
@@ -2419,7 +2421,8 @@ setTimeout(async () => {
 """
     )
     result = subprocess.run(
-        ["node", "-e", harness],
+        ["node", "-"],
+        input=harness,
         check=False,
         capture_output=True,
         text=True,

@@ -386,7 +386,8 @@ if (["approve-response-lost", "cancel-during-approve"].includes(scenario)) {{
 console.log(JSON.stringify(result));
 """
     result = subprocess.run(
-        ["node", "--input-type=module", "-e", harness],
+        ["node", "--input-type=module", "-"],
+        input=harness,
         check=False,
         capture_output=True,
         text=True,

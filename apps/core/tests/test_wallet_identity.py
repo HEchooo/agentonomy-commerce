@@ -15,7 +15,9 @@ from eth_account.messages import encode_defunct
 from eth_utils import keccak
 from sqlalchemy import create_engine, inspect, text
 from sqlalchemy.exc import IntegrityError, OperationalError
+from sqlalchemy.orm import sessionmaker
 
+import services.account_service.repository as account_repository_module
 from services.account_service import (
     AccountRepository,
     SpendingGrant,
@@ -113,36 +115,78 @@ def _concurrent_outcomes(*operations):
         return [future.result() for future in [executor.submit(execute, op) for op in operations]]
 
 
-def test_sqlite_immediate_session_retries_a_locked_commit():
-    class FakeConnection:
-        def exec_driver_sql(self, statement: str) -> None:
-            assert statement == "BEGIN IMMEDIATE"
+def test_sqlite_immediate_session_retries_a_locked_commit(tmp_path, monkeypatch):
+    database_path = tmp_path / "locked-commit.sqlite3"
+    engine = create_engine(
+        f"sqlite+pysqlite:///{database_path}", connect_args={"timeout": 0}
+    )
+    with engine.begin() as connection:
+        connection.exec_driver_sql("PRAGMA journal_mode=DELETE")
+        connection.execute(text("CREATE TABLE items (id INTEGER PRIMARY KEY, value TEXT)"))
 
-    class FakeSession:
-        def __init__(self) -> None:
-            self.commit_attempts = 0
-            self.closed = False
+    sessions = sessionmaker(engine, expire_on_commit=False)
+    reader = sessions()
+    reader.connection().exec_driver_sql("BEGIN")
+    reader.execute(text("SELECT * FROM items")).all()
+    sleeps = []
 
-        def connection(self) -> FakeConnection:
-            return FakeConnection()
+    def release_reader(delay):
+        sleeps.append(delay)
+        if len(sleeps) == 1:
+            reader.rollback()
 
-        def commit(self) -> None:
-            self.commit_attempts += 1
-            if self.commit_attempts == 1:
-                raise OperationalError("COMMIT", {}, RuntimeError("database is locked"))
+    monkeypatch.setattr(account_repository_module.time, "sleep", release_reader)
+    try:
+        with sqlite_immediate_session(sessions, operation="test transaction") as session:
+            session.execute(text("INSERT INTO items (value) VALUES ('committed')"))
+    finally:
+        reader.close()
 
-        def rollback(self) -> None:
-            raise AssertionError("locked commit should be retried without rollback")
+    assert sleeps
+    with engine.connect() as connection:
+        assert connection.execute(text("SELECT value FROM items")).all() == [
+            ("committed",)
+        ]
 
-        def close(self) -> None:
-            self.closed = True
 
-    session = FakeSession()
-    with sqlite_immediate_session(lambda: session, operation="test transaction"):
-        pass
+def test_sqlite_immediate_session_rolls_back_after_locked_commit_exhaustion(
+    tmp_path, monkeypatch
+):
+    database_path = tmp_path / "locked-commit-exhausted.sqlite3"
+    engine = create_engine(
+        f"sqlite+pysqlite:///{database_path}", connect_args={"timeout": 0}
+    )
+    with engine.begin() as connection:
+        connection.exec_driver_sql("PRAGMA journal_mode=DELETE")
+        connection.execute(text("CREATE TABLE items (id INTEGER PRIMARY KEY, value TEXT)"))
 
-    assert session.commit_attempts == 2
-    assert session.closed is True
+    sessions = sessionmaker(engine, expire_on_commit=False)
+    reader = sessions()
+    reader.connection().exec_driver_sql("BEGIN")
+    reader.execute(text("SELECT * FROM items")).all()
+    sleeps = []
+    monkeypatch.setattr(
+        account_repository_module.time, "sleep", lambda delay: sleeps.append(delay)
+    )
+
+    try:
+        with pytest.raises(OperationalError, match="database is locked"):
+            with sqlite_immediate_session(sessions, operation="test transaction") as session:
+                session.execute(text("INSERT INTO items (value) VALUES ('rolled back')"))
+    finally:
+        reader.rollback()
+        reader.close()
+
+    assert len(sleeps) == 4
+    with engine.connect() as connection:
+        assert connection.execute(text("SELECT * FROM items")).all() == []
+
+    with sqlite_immediate_session(sessions, operation="test transaction") as session:
+        session.execute(text("INSERT INTO items (value) VALUES ('after release')"))
+    with engine.connect() as connection:
+        assert connection.execute(text("SELECT value FROM items")).all() == [
+            ("after release",)
+        ]
 
 
 def _active_grant(wallet_identity_id: str, now: datetime) -> SpendingGrant:

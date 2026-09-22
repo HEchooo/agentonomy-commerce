@@ -15,9 +15,19 @@ RUNNER_PID_FILE="$RUNTIME_DIR/runner.pid"
 
 SERVICE_IDENTITIES=()
 OWNS_RUNTIME_METADATA=0
+IDLE_SLEEP_PID=""
+
+stop_idle_sleep() {
+  if [ -n "$IDLE_SLEEP_PID" ]; then
+    kill "$IDLE_SLEEP_PID" >/dev/null 2>&1 || true
+    wait "$IDLE_SLEEP_PID" >/dev/null 2>&1 || true
+    IDLE_SLEEP_PID=""
+  fi
+}
 
 cleanup() {
   trap - EXIT INT TERM
+  stop_idle_sleep
   if [ "${#SERVICE_IDENTITIES[@]}" -gt 0 ]; then
     echo
     echo "Stopping Clink Core services..."
@@ -198,5 +208,8 @@ echo "Use bash run_demo_stop.sh to stop the runtime safely."
 echo "Press Ctrl+C to stop all Clink Core processes."
 
 while true; do
-  sleep 5
+  sleep 5 &
+  IDLE_SLEEP_PID=$!
+  wait "$IDLE_SLEEP_PID" || true
+  IDLE_SLEEP_PID=""
 done

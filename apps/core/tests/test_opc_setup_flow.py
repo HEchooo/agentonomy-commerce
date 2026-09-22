@@ -931,8 +931,10 @@ console.log(JSON.stringify({
             "if (true) {\n" + postamble_extra + "\n} else if (summarySelection) {",
             1,
         )
+    script = preamble + preamble_extra + javascript + postamble
     result = subprocess.run(
-        ["node", "--input-type=module", "-e", preamble + preamble_extra + javascript + postamble],
+        ["node", "--input-type=module", "-"],
+        input=script,
         check=False,
         capture_output=True,
         text=True,

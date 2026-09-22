@@ -57,7 +57,9 @@ def _assert_browser_accepts_real_plan(plan, form, identity, target, grant=None):
           "if (opcSetupPlanMatchesReview(ctx.plan, ctx.form, ctx.grant, ctx.target)) "
           "throw new Error('Browser accepted authority above reviewed total');\n"
     )
-    result = subprocess.run(["node", "-e", script], capture_output=True, text=True, timeout=10)
+    result = subprocess.run(
+        ["node", "-"], input=script, capture_output=True, text=True, timeout=10
+    )
     assert result.returncode == 0, result.stderr
 
 

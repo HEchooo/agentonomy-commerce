@@ -11,7 +11,7 @@ Imported regression results on the exported source and independent environment:
 
 | Suite | Result |
 | --- | --- |
-| Core | 2,094 passed |
+| Core | 2,095 passed, including real SQLite commit-contention coverage |
 | Marketplace | 320 passed, including 6 new grant/policy handoff cases |
 | Node | 841 passed, 1 skipped |
 | Hosted + profile tests | 522 passed, 4 skipped |
@@ -28,9 +28,8 @@ Existing dependency deprecation warnings remain.
 
 During initial checks, a Core lifecycle test could not inspect processes inside
 the restricted sandbox; the full Core suite then passed outside that restriction.
-One initial run using Clink's old environment hit a concurrent SQLite grant-test
-transaction error; the full suite passed in the independently installed
-configuration. No claim is made that every concurrency schedule has been tested.
+A concurrent SQLite grant-test transaction error occurred intermittently during
+validation and was subsequently reproduced deterministically and fixed below.
 The export initially omitted Marketplace's `.dockerignore`; it was restored and
 the complete Marketplace suite passed with the virtualenv on PATH.
 
@@ -49,10 +48,25 @@ verified BUDGET_EXCEEDED, revoked grant rejection and paid-but-undelivered
 terminal replay without an additional debit. Worker timeout/mismatched-response
 tests ensure a broken transport cannot reuse an old reply for a new operation.
 
-The initial grant concurrency anomaly was subsequently checked with 20 separate
-invocations in the pinned independent environment; all 20 passed. The underlying
-Core concurrency implementation was not changed by this export.
+The initial grant concurrency anomaly passed 20 separate repeat invocations,
+but returned during full regression. A real reader-lock test then reproduced
+`PendingRollbackError` deterministically: ORM commit invalidated its transaction
+after SQLite returned BUSY. The SQLite helper now flushes changes, retries the
+explicit SQL COMMIT while its transaction remains valid, and finalizes ORM state
+after success. Two real contention cases verify successful retry and bounded
+exhaustion with complete rollback and subsequent recovery. Both failed before
+the fix; the wallet identity and spending grant suites then passed (93 tests).
+PostgreSQL transaction handling is unchanged.
 
 Public MCP responses use a purchase/preview field allowlist. Black-box checks reject
 nested identity overrides and verify that previews, purchases and results do not
 expose internal user/agent/grant/policy identifiers or receipt signing keys.
+
+The first GitHub Linux run exposed the per-argument limit for JavaScript passed
+to `node -e`. Nine large-script invocations in six Core test files now pass their
+unchanged scripts through stdin; all 249 affected tests passed locally.
+
+The Linux lifecycle check also exposed a foreground `sleep 5` delaying Bash
+TERM traps beyond the stop timeout. The Core runner now waits on a background
+sleep and explicitly terminates/reaps it during cleanup. A behavioral Bash
+reproduction measured approximately 5.0 seconds before and 0.2 seconds after.
