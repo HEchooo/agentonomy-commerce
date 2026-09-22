@@ -32,9 +32,9 @@ def main() -> None:
     original_client = app.CORE_ACCOUNT_CLIENT
     try:
         app.CORE_ACCOUNT_CLIENT = FakeCoreAccountClient()
-        readiness = app.core_account_readiness("telegram_jeff_feng")
+        readiness = app.core_account_readiness("telegram_demo_user")
         link = app.create_core_account_setup_link(
-            app.CoreAccountSetupRequest(user_id="telegram_jeff_feng")
+            app.CoreAccountSetupRequest(user_id="telegram_demo_user")
         )
     finally:
         app.CORE_ACCOUNT_CLIENT = original_client

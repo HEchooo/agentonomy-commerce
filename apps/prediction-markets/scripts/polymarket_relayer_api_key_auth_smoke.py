@@ -39,7 +39,7 @@ def main() -> None:
         with patch("importlib.util.find_spec") as find_spec:
             find_spec.return_value = object()
             readiness = service.check_readiness(
-                user_id="telegram_jeff_feng",
+                user_id="telegram_demo_user",
                 owner_wallet="0x1111111111111111111111111111111111111111",
             )
 

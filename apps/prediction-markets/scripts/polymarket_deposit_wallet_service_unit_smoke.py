@@ -94,7 +94,7 @@ def main() -> None:
         )
         missing_service = PolymarketDepositWalletService(config=missing_config)
         missing = missing_service.check_readiness(
-            user_id="telegram_jeff_feng",
+            user_id="telegram_demo_user",
             owner_wallet="0x1111111111111111111111111111111111111111",
         )
         assert missing.status == "credentials_missing"
@@ -112,7 +112,7 @@ def main() -> None:
         service = PolymarketDepositWalletService(config=ready_config, relayer_client=FakeRelayerClient())
         derived = service.prepare_deposit_wallet(
             PreparePolymarketDepositWalletRequest(
-                user_id="telegram_jeff_feng",
+                user_id="telegram_demo_user",
                 owner_wallet="0x1111111111111111111111111111111111111111",
                 mode="derive",
             )
@@ -122,7 +122,7 @@ def main() -> None:
         assert derived.next_action == "deploy_polymarket_deposit_wallet"
 
         readiness = service.check_readiness(
-            user_id="telegram_jeff_feng",
+            user_id="telegram_demo_user",
             owner_wallet="0x1111111111111111111111111111111111111111",
         )
         assert readiness.status == "derived"
@@ -133,7 +133,7 @@ def main() -> None:
 
         service.relayer_client.deployed = True
         reconciled = service.check_readiness(
-            user_id="telegram_jeff_feng",
+            user_id="telegram_demo_user",
             owner_wallet="0x1111111111111111111111111111111111111111",
         )
         assert reconciled.status == "deployed"
@@ -160,7 +160,7 @@ def main() -> None:
             relayer_client=FakeRelayerClient(),
         )
         persisted = restarted.check_readiness(
-            user_id="telegram_jeff_feng",
+            user_id="telegram_demo_user",
             owner_wallet="0x1111111111111111111111111111111111111111",
         )
         assert persisted.status == "deployed"
@@ -179,13 +179,13 @@ def main() -> None:
         )
         error_service.prepare_deposit_wallet(
             PreparePolymarketDepositWalletRequest(
-                user_id="telegram_jeff_feng",
+                user_id="telegram_demo_user",
                 owner_wallet="0x1111111111111111111111111111111111111111",
                 mode="derive",
             )
         )
         failed_closed = error_service.check_readiness(
-            user_id="telegram_jeff_feng",
+            user_id="telegram_demo_user",
             owner_wallet="0x1111111111111111111111111111111111111111",
         )
         assert failed_closed.status == "derived"
@@ -200,7 +200,7 @@ def main() -> None:
             relayer_client=FakeRelayerClient(),
         )
         persisted_error = error_restarted.check_readiness(
-            user_id="telegram_jeff_feng",
+            user_id="telegram_demo_user",
             owner_wallet="0x1111111111111111111111111111111111111111",
         )
         assert persisted_error.status == "derived"
@@ -242,7 +242,7 @@ def main() -> None:
 
         deployed = service.prepare_deposit_wallet(
             PreparePolymarketDepositWalletRequest(
-                user_id="telegram_jeff_feng",
+                user_id="telegram_demo_user",
                 owner_wallet="0x1111111111111111111111111111111111111111",
                 mode="deploy",
             )
@@ -263,14 +263,14 @@ def main() -> None:
         )
         submitted_service.prepare_deposit_wallet(
             PreparePolymarketDepositWalletRequest(
-                user_id="telegram_jeff_feng",
+                user_id="telegram_demo_user",
                 owner_wallet="0x1111111111111111111111111111111111111111",
                 mode="derive",
             )
         )
         submitted = submitted_service.prepare_deposit_wallet(
             PreparePolymarketDepositWalletRequest(
-                user_id="telegram_jeff_feng",
+                user_id="telegram_demo_user",
                 owner_wallet="0x1111111111111111111111111111111111111111",
                 mode="deploy",
             )
@@ -283,7 +283,7 @@ def main() -> None:
         assert submitted.can_use_x402 is False
 
         submitted_readiness = submitted_service.check_readiness(
-            user_id="telegram_jeff_feng",
+            user_id="telegram_demo_user",
             owner_wallet="0x1111111111111111111111111111111111111111",
         )
         assert submitted_readiness.status == "submitted"
@@ -296,7 +296,7 @@ def main() -> None:
         write_state(
             legacy_state_file,
             {
-                "user_id": "telegram_jeff_feng",
+                "user_id": "telegram_demo_user",
                 "owner_wallet": "0x1111111111111111111111111111111111111111",
                 "deposit_wallet": "0x4444444444444444444444444444444444444444",
                 "status": "derived",
@@ -314,7 +314,7 @@ def main() -> None:
         write_state(
             legacy_state_file,
             {
-                "user_id": "telegram_jeff_feng",
+                "user_id": "telegram_demo_user",
                 "owner_wallet": "0x1111111111111111111111111111111111111111",
                 "deposit_wallet": None,
                 "status": "submitted",
@@ -340,7 +340,7 @@ def main() -> None:
             relayer_client=SubmittedOnlyRelayerClient(),
         )
         legacy_readiness = legacy_service.check_readiness(
-            user_id="telegram_jeff_feng",
+            user_id="telegram_demo_user",
             owner_wallet="0x1111111111111111111111111111111111111111",
         )
         assert legacy_readiness.status == "submitted"
@@ -354,7 +354,7 @@ def main() -> None:
         write_state(
             confirmed_state_file,
             {
-                "user_id": "telegram_jeff_feng",
+                "user_id": "telegram_demo_user",
                 "owner_wallet": "0x1111111111111111111111111111111111111111",
                 "deposit_wallet": "0x5555555555555555555555555555555555555555",
                 "status": "submitted",
@@ -380,7 +380,7 @@ def main() -> None:
             relayer_client=ConfirmedSubmittedRelayerClient(),
         )
         confirmed_readiness = confirmed_service.check_readiness(
-            user_id="telegram_jeff_feng",
+            user_id="telegram_demo_user",
             owner_wallet="0x1111111111111111111111111111111111111111",
         )
         assert confirmed_readiness.status == "deployed"

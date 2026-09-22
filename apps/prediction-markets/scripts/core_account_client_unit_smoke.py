@@ -50,7 +50,7 @@ def main() -> None:
             )
         return FakeResponse(
             {
-                "user_id": "telegram_jeff_feng",
+                "user_id": "telegram_demo_user",
                 "wallet_bound": False,
                 "spending_grant_active": False,
                 "ready": False,
@@ -63,8 +63,8 @@ def main() -> None:
             base_url="http://core-account.internal:8019",
             internal_token="internal-secret",
         )
-        readiness = client.readiness("telegram_jeff_feng")
-        link = client.create_setup_link("telegram_jeff_feng")
+        readiness = client.readiness("telegram_demo_user")
+        link = client.create_setup_link("telegram_demo_user")
     finally:
         urllib.request.urlopen = original_urlopen
 
@@ -73,14 +73,14 @@ def main() -> None:
     assert requests == [
         {
             "method": "GET",
-            "url": "http://core-account.internal:8019/internal/account-readiness?user_id=telegram_jeff_feng",
+            "url": "http://core-account.internal:8019/internal/account-readiness?user_id=telegram_demo_user",
             "authorization": "Bearer internal-secret",
         },
         {
             "method": "POST",
             "url": "http://core-account.internal:8019/internal/account-sessions",
             "authorization": "Bearer internal-secret",
-            "body": {"user_id": "telegram_jeff_feng"},
+            "body": {"user_id": "telegram_demo_user"},
         },
     ]
     print(json.dumps({"status": "ok"}, indent=2))

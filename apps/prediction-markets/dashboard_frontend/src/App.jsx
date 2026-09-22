@@ -101,7 +101,7 @@ function shortHash(value) {
 
 function dashboardUserId() {
   const params = new URLSearchParams(window.location.search);
-  return params.get("user_id") || import.meta.env.VITE_DEFAULT_USER_ID || "telegram_jeff_feng";
+  return params.get("user_id") || import.meta.env.VITE_DEFAULT_USER_ID || "telegram_demo_user";
 }
 
 function workspaceFromHash() {

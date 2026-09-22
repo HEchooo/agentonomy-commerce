@@ -165,7 +165,7 @@ def main() -> None:
         }
 
     def account_readiness(user_id: str) -> dict:
-        assert user_id == "telegram_jeff_feng"
+        assert user_id == "telegram_demo_user"
         readiness_calls.append(user_id)
         return readiness_payload(user_id)
 
@@ -175,7 +175,7 @@ def main() -> None:
         account_readiness_fetcher=account_readiness,
     )
     anonymous_snapshot = service.build_snapshot()
-    snapshot = service.build_snapshot(user_id="telegram_jeff_feng")
+    snapshot = service.build_snapshot(user_id="telegram_demo_user")
 
     sub_cent_snapshot = PortfolioService(
         config=config,
@@ -184,7 +184,7 @@ def main() -> None:
             user_id,
             per_transaction="0.005000",
         ),
-    ).build_snapshot(user_id="telegram_jeff_feng")
+    ).build_snapshot(user_id="telegram_demo_user")
 
     non_amplified_snapshot = PortfolioService(
         config=config,
@@ -193,7 +193,7 @@ def main() -> None:
             user_id,
             per_transaction="0.0050009",
         ),
-    ).build_snapshot(user_id="telegram_jeff_feng")
+    ).build_snapshot(user_id="telegram_demo_user")
 
     mismatched_snapshot = PortfolioService(
         config=config,
@@ -201,7 +201,7 @@ def main() -> None:
         account_readiness_fetcher=lambda _user_id: readiness_payload(
             "different_user"
         ),
-    ).build_snapshot(user_id="telegram_jeff_feng")
+    ).build_snapshot(user_id="telegram_demo_user")
 
     def readiness_without_user(user_id: str) -> dict:
         payload = readiness_payload(user_id)
@@ -212,7 +212,7 @@ def main() -> None:
         config=config,
         ledger=ledger,
         account_readiness_fetcher=readiness_without_user,
-    ).build_snapshot(user_id="telegram_jeff_feng")
+    ).build_snapshot(user_id="telegram_demo_user")
 
     def unavailable_account_readiness(_user_id: str) -> dict:
         raise RuntimeError("Core Account is unavailable")
@@ -221,11 +221,11 @@ def main() -> None:
         config=config,
         ledger=ledger,
         account_readiness_fetcher=unavailable_account_readiness,
-    ).build_snapshot(user_id="telegram_jeff_feng")
+    ).build_snapshot(user_id="telegram_demo_user")
 
     assert snapshot.summary.capital_deployed_usd == "10.00"
     assert snapshot.summary.current_value_usd == "12.00"
-    assert readiness_calls == ["telegram_jeff_feng"]
+    assert readiness_calls == ["telegram_demo_user"]
     assert anonymous_snapshot.summary.available_budget_usd is None
     assert anonymous_snapshot.summary.available_budget_status == "unavailable"
     assert snapshot.summary.available_budget_usd == "2.000000"

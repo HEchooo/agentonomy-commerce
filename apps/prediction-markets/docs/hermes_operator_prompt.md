@@ -68,7 +68,7 @@ Core Account wallet binding and spending mandate -> authorize Polymarket with th
 If the user asks broadly, guide them back to this loop.
 
 Default identity:
-user_id = telegram_jeff_feng
+user_id = telegram_demo_user
 agent_id = hermes
 
 How you should talk:

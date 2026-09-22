@@ -38,7 +38,7 @@ class FakeCoreAccountClient:
         }
 
     def create_setup_link(self, user_id: str) -> dict:
-        assert user_id == "telegram_jeff_feng"
+        assert user_id == "telegram_demo_user"
         return {
             "session_id": "account_session_123",
             "account_url": "https://account.example/account/token-123",
@@ -53,7 +53,7 @@ def main() -> None:
 
     def fake_request_json(base_url: str, path: str, payload=None):
         del base_url, payload
-        if path == "/polymarket/bindings/latest/telegram_jeff_feng":
+        if path == "/polymarket/bindings/latest/telegram_demo_user":
             return {"status": "unavailable", "next_action": "create_polymarket_account_binding"}
         raise AssertionError(f"unexpected request: {path}")
 
@@ -62,7 +62,7 @@ def main() -> None:
         if path.startswith("/polymarket/deposit-wallet/readiness?"):
             return {
                 "service": "prediction_markets_deposit_wallet_service",
-                "user_id": "telegram_jeff_feng",
+                "user_id": "telegram_demo_user",
                 "owner_wallet": OWNER_WALLET,
                 "deposit_wallet": READY_DEPOSIT_WALLET,
                 "status": "deployed",
@@ -91,19 +91,19 @@ def main() -> None:
         fake_core_account_client = FakeCoreAccountClient()
         server.CORE_ACCOUNT_CLIENT = fake_core_account_client
         server._request_json = fake_request_json
-        link = server.create_core_account_setup_link("telegram_jeff_feng")
-        readiness = server.get_prediction_market_user_readiness("telegram_jeff_feng")
+        link = server.create_core_account_setup_link("telegram_demo_user")
+        readiness = server.get_prediction_market_user_readiness("telegram_demo_user")
         fake_core_account_client.wallet_bound = True
         server._request_json = fake_binding_request_json
         binding_session = server.create_polymarket_account_binding_link(
-            "telegram_jeff_feng"
+            "telegram_demo_user"
         )
     finally:
         server.CORE_ACCOUNT_CLIENT = original_client
         server._request_json = original_request_json
 
     assert link == {
-        "user_id": "telegram_jeff_feng",
+        "user_id": "telegram_demo_user",
         "status": "pending_user_action",
         "account_url": "https://account.example/account/token-123",
         "expires_at": "2026-07-17T12:00:00Z",

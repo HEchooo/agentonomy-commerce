@@ -34,7 +34,7 @@ def main() -> None:
 
         derived = service.prepare_deposit_wallet(
             PreparePolymarketDepositWalletRequest(
-                user_id="telegram_jeff_feng",
+                user_id="telegram_demo_user",
                 owner_wallet="0x1111111111111111111111111111111111111111",
                 mode="derive",
             )
@@ -45,7 +45,7 @@ def main() -> None:
 
         deployed = service.prepare_deposit_wallet(
             PreparePolymarketDepositWalletRequest(
-                user_id="telegram_jeff_feng",
+                user_id="telegram_demo_user",
                 owner_wallet="0x1111111111111111111111111111111111111111",
                 mode="deploy",
             )

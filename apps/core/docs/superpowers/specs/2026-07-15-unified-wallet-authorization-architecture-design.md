@@ -269,7 +269,7 @@ POST /spending-reservations/{id}/release
 
 ```json
 {
-  "user_id": "telegram_jeff_feng",
+  "user_id": "telegram_demo_user",
   "agent_id": "hermes",
   "product": "prediction_markets",
   "venue": "polymarket",

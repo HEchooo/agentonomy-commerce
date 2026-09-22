@@ -67,7 +67,7 @@ def main() -> None:
     internal_path = "/internal/portfolio/snapshot"
     internal_snapshot = client.get(
         internal_path,
-        params={"user_id": "telegram_jeff_feng"},
+        params={"user_id": "telegram_demo_user"},
         headers={"Authorization": "Bearer ignored-by-public-portfolio"},
     )
     assert internal_snapshot.status_code == 404

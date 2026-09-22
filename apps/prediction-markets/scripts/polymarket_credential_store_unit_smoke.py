@@ -29,7 +29,7 @@ def main() -> None:
             funder_address="0x1111111111111111111111111111111111111111",
         )
         record = store.save_polymarket_credentials(
-            user_id="telegram_jeff_feng",
+            user_id="telegram_demo_user",
             wallet_address="0x2222222222222222222222222222222222222222",
             credentials=credentials,
         )
@@ -39,7 +39,7 @@ def main() -> None:
         assert "pm-passphrase" not in raw_storage
         assert record.api_key_fingerprint.startswith("sha256:")
 
-        loaded = store.get_polymarket_credentials("telegram_jeff_feng")
+        loaded = store.get_polymarket_credentials("telegram_demo_user")
         assert loaded is not None
         assert loaded.api_key == "pm-key"
         assert loaded.api_secret == "pm-secret"

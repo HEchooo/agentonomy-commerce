@@ -29,7 +29,7 @@ def main() -> None:
 
         with patch("importlib.util.find_spec", return_value=None):
             readiness = service.check_readiness(
-                user_id="telegram_jeff_feng",
+                user_id="telegram_demo_user",
                 owner_wallet="0x1111111111111111111111111111111111111111",
             )
             assert readiness.status == "sdk_missing"
@@ -40,7 +40,7 @@ def main() -> None:
 
             prepared = service.prepare_deposit_wallet(
                 PreparePolymarketDepositWalletRequest(
-                    user_id="telegram_jeff_feng",
+                    user_id="telegram_demo_user",
                     owner_wallet="0x1111111111111111111111111111111111111111",
                     mode="derive",
                 )

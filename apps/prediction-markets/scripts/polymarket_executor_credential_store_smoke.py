@@ -78,7 +78,7 @@ def main() -> None:
         blocked = executor.submit_signed_order(
             {"signature": "0xsigned"},
             "FAK",
-            user_id="telegram_jeff_feng",
+            user_id="telegram_demo_user",
             **scope,
         )
         assert blocked.submitted is False
@@ -86,7 +86,7 @@ def main() -> None:
         assert "create_polymarket_account_binding" in (blocked.reason or "")
 
         store.save_polymarket_credentials(
-            user_id="telegram_jeff_feng",
+            user_id="telegram_demo_user",
             wallet_address="0x2222222222222222222222222222222222222222",
             credentials=PolymarketApiCredentials(
                 api_key="pm-key",
@@ -99,14 +99,14 @@ def main() -> None:
         submitted = executor.submit_signed_order(
             {"signature": "0xsigned"},
             "FAK",
-            user_id="telegram_jeff_feng",
+            user_id="telegram_demo_user",
             **scope,
         )
         assert submitted.submitted is True
         assert submitted.order_id == executor.expected_order_id
         assert submitted.tx_hash == "0xtx"
 
-        readiness = executor.readiness(user_id="telegram_jeff_feng")
+        readiness = executor.readiness(user_id="telegram_demo_user")
         assert readiness.ready is True
         assert readiness.metadata["POLYMARKET_CREDENTIAL_SOURCE"] == "credential_store"
 

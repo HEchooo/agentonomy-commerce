@@ -53,10 +53,10 @@ def main() -> None:
 
     def fake_request_json(base_url: str, path: str, payload=None):
         calls.append(path)
-        if path == "/polymarket/bindings/latest/telegram_jeff_feng":
+        if path == "/polymarket/bindings/latest/telegram_demo_user":
             return {
                 "binding_id": "pm_binding_123",
-                "user_id": "telegram_jeff_feng",
+                "user_id": "telegram_demo_user",
                 "status": "active",
                 "has_api_credentials": True,
                 "wallet_address": "0x1111111111111111111111111111111111111111",
@@ -68,7 +68,7 @@ def main() -> None:
         if path.startswith("/polymarket/deposit-wallet/readiness"):
             return {
                 "service": "prediction_markets_deposit_wallet_service",
-                "user_id": "telegram_jeff_feng",
+                "user_id": "telegram_demo_user",
                 "owner_wallet": "0x1111111111111111111111111111111111111111",
                 "deposit_wallet": "0x2222222222222222222222222222222222222222",
                 "status": "deployed",
@@ -111,7 +111,7 @@ def main() -> None:
                 "spending_authorizations": [
                     {
                         "spending_authorization_id": "spend_auth_123",
-                        "user_id": "telegram_jeff_feng",
+                        "user_id": "telegram_demo_user",
                         "agent_id": "hermes",
                         "wallet_address": "0x1111111111111111111111111111111111111111",
                         "spender_address": "0x3333333333333333333333333333333333333333",
@@ -130,7 +130,7 @@ def main() -> None:
             }
         if path == (
             "/polymarket/funding-operations/pm_funding_123"
-            "?user_id=telegram_jeff_feng"
+            "?user_id=telegram_demo_user"
         ):
             return {
                 "operation_id": "pm_funding_123",
@@ -158,7 +158,7 @@ def main() -> None:
         server.CORE_ACCOUNT_CLIENT = FakeCoreAccountClient()
         server._request_json = fake_request_json
         readiness = server.get_prediction_market_user_readiness(
-            "telegram_jeff_feng",
+            "telegram_demo_user",
             funding_operation_id="pm_funding_123",
         )
     finally:

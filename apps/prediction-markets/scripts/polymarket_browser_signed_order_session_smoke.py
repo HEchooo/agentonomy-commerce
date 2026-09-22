@@ -53,7 +53,7 @@ class FakeCoreGateway:
 
 class FakeAccountBindingGateway:
     def latest_polymarket_binding(self, user_id: str) -> dict:
-        assert user_id == "telegram_jeff_feng"
+        assert user_id == "telegram_demo_user"
         return {
             "binding_id": "pm_binding_browser_signed",
             "user_id": user_id,
@@ -72,7 +72,7 @@ class FakeAccountIdentityGateway:
         self.wallet_address = "0x2222222222222222222222222222222222222222"
 
     def active_wallet(self, user_id: str) -> str | None:
-        assert user_id == "telegram_jeff_feng"
+        assert user_id == "telegram_demo_user"
         return self.wallet_address
 
 
@@ -87,7 +87,7 @@ class FakeFundingGateway:
         binding_id: str,
         venue_wallet_address: str,
     ) -> dict:
-        assert user_id == "telegram_jeff_feng"
+        assert user_id == "telegram_demo_user"
         assert platform == "polymarket"
         assert amount_usd == "1"
         assert funding_operation_id == "funding_browser_signed"
@@ -143,7 +143,7 @@ class FakePolymarketExecutor(PolymarketExecutor):
         assert signed_order["maker"] == "0x1111111111111111111111111111111111111111"
         assert signed_order["signer"] == "0x1111111111111111111111111111111111111111"
         assert order_type == "GTC"
-        assert user_id == "telegram_jeff_feng"
+        assert user_id == "telegram_demo_user"
         assert binding_id == "pm_binding_browser_signed"
         assert owner_address == "0x2222222222222222222222222222222222222222"
         assert wallet_address == "0x1111111111111111111111111111111111111111"
@@ -182,7 +182,7 @@ def _preview() -> PredictionMarketOrderPreview:
 
     return PredictionMarketOrderPreview(
         preview_id="pm_preview_browser_signed",
-        user_id="telegram_jeff_feng",
+        user_id="telegram_demo_user",
         agent_id="hermes_agent",
         platform="polymarket",
         market_id=market.market_id,

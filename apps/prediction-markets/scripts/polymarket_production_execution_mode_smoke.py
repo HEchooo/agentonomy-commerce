@@ -24,7 +24,7 @@ def _preview() -> PredictionMarketOrderPreview:
     )
     return PredictionMarketOrderPreview(
         preview_id="pm_preview_prod_gate",
-        user_id="telegram_jeff_feng",
+        user_id="telegram_demo_user",
         agent_id="hermes_agent",
         platform="polymarket",
         market_id=market.market_id,
