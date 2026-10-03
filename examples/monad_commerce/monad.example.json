@@ -1,0 +1,13 @@
+{
+  "mode": "monad_testnet",
+  "chain_id": 10143,
+  "rpc_urls": ["https://testnet-rpc.monad.xyz", "https://rpc-testnet.monadinfra.com"],
+  "token": "",
+  "executor": "",
+  "payee": "",
+  "token_code_hash": "",
+  "executor_code_hash": "",
+  "token_decimals": 6,
+  "gas_limit": 500000,
+  "max_gas_price_wei": 500000000000
+}

@@ -213,7 +213,7 @@ def test_runtime_schema_check_requires_wallet_challenge_creator_browser_session(
     problems = check_runtime_schema(database_url)
     assert problems[0] == (
         "migration revision is not at head "
-        "(current=['20260716_0011'], expected=['20260916_0022'])"
+        "(current=['20260716_0011'], expected=['20261003_0023'])"
     )
     assert "missing required column: account_sessions.created_by_public_account_session_id" in problems
     assert "missing required table: action_approvals" in problems

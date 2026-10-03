@@ -84,7 +84,7 @@ class PolicyDecisionRow(Base):
         ),
         CheckConstraint(
             "chain IS NULL OR chain IN "
-            "('eip155:137', 'eip155:8453', 'eip155:80002')",
+            "('eip155:137', 'eip155:8453', 'eip155:80002', 'eip155:10143', 'eip155:31337')",
             name="ck_policy_decision_chain_canonical",
         ),
         Index("ix_policy_decisions_action_evaluated", "action_id", "evaluated_at"),

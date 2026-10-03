@@ -1,4 +1,19 @@
-# Agentonomy USDC Executor
+# Agentonomy payment executors
+
+The new `AgentonomyBudgetExecutor` uses owner-signed `SpendGrant` plus a separate
+Core execution signature. It enforces fixed asset/payee, time bounds, per-payment
+and cumulative caps, owner revocation, cross-grant owner/order replay protection,
+and atomic exact ERC-20 transfers. It has no upgrade/admin/arbitrary-call API.
+`AgentonomyTestUSD` is a six-decimal, fixed-supply test token with no value.
+
+See [protocol](../docs/monad/design.md) and [deployment](../docs/monad/deployment.md).
+Run all contract tests from the repository root with `make test-contracts`.
+New deployment requires a mandatory token codehash and exact executor **init-code
+hash including constructor arguments**, checked before broadcast. Public deployment
+is pending. New Solidity files retain `UNLICENSED` until an explicit license decision.
+
+## Existing USDC executor
+
 
 `AgentonomyUSDCExecutor` is a narrow, non-upgradeable USDC payment executor.
 It accepts only a current KMS execution-authority signature over the fixed

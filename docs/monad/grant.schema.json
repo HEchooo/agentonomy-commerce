@@ -1,0 +1,66 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://agentonomy.invalid/schemas/monad/grant.schema.json",
+  "title": "Agentonomy Budget Executor SpendGrant",
+  "description": "Exact JSON wire form of a SpendGrant. Every uint256 is a canonical unsigned decimal string; Python implementations also enforce the uint256 upper bound.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "grantId",
+    "owner",
+    "agentScope",
+    "token",
+    "payee",
+    "maxPerPayment",
+    "maxTotal",
+    "validAfter",
+    "validUntil",
+    "executionSigner"
+  ],
+  "properties": {
+    "grantId": { "$ref": "#/$defs/nonzeroBytes32" },
+    "owner": { "$ref": "#/$defs/nonzeroAddress" },
+    "agentScope": { "$ref": "#/$defs/nonzeroBytes32" },
+    "token": { "$ref": "#/$defs/nonzeroAddress" },
+    "payee": { "$ref": "#/$defs/nonzeroAddress" },
+    "maxPerPayment": { "$ref": "#/$defs/positiveUint256String" },
+    "maxTotal": { "$ref": "#/$defs/positiveUint256String" },
+    "validAfter": { "$ref": "#/$defs/uint256String" },
+    "validUntil": { "$ref": "#/$defs/uint256String" },
+    "executionSigner": { "$ref": "#/$defs/nonzeroAddress" }
+  },
+  "$defs": {
+    "uint256String": {
+      "type": "string",
+      "pattern": "^(?:0|[1-9][0-9]*)$",
+      "maxLength": 78,
+      "description": "Canonical unsigned decimal representation of a value in the uint256 range. The implementation must additionally reject values greater than 2^256-1."
+    },
+    "positiveUint256String": {
+      "type": "string",
+      "pattern": "^[1-9][0-9]*$",
+      "maxLength": 78,
+      "description": "Canonical unsigned decimal representation of a positive value in the uint256 range."
+    },
+    "bytes32": {
+      "type": "string",
+      "pattern": "^0x[0-9a-fA-F]{64}$"
+    },
+    "nonzeroBytes32": {
+      "allOf": [
+        { "$ref": "#/$defs/bytes32" },
+        { "not": { "const": "0x0000000000000000000000000000000000000000000000000000000000000000" } }
+      ]
+    },
+    "address": {
+      "type": "string",
+      "pattern": "^0x[0-9a-fA-F]{40}$"
+    },
+    "nonzeroAddress": {
+      "allOf": [
+        { "$ref": "#/$defs/address" },
+        { "not": { "const": "0x0000000000000000000000000000000000000000" } }
+      ]
+    }
+  }
+}

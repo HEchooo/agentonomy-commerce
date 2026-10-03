@@ -7,6 +7,17 @@ mandates, policy checks, budget reservations, payment verification and delivery.
 Agents use one `clink_node` MCP entry. The Core controls funds; Marketplace
 manages the purchase and returns the result.
 
+## Monad budget-contract implementation
+
+A separate real local-EVM composition now adds an owner-signed EIP-712 budget,
+contract-enforced limits/revocation, durable Core execution, independent payment
+verification and HTTP delivery. It is self-contained in this repository.
+Start with [the quickstart](docs/monad/quickstart.md),
+[acceptance record](docs/monad/acceptance.md), and
+[public deployment prerequisites](docs/monad/deployment.md).
+Public Monad deployment and wallet acceptance remain pending; the existing review
+service below continues to use explicitly simulated settlement.
+
 ## Run locally
 
 Use Python 3.12 for the reproducible environment below.

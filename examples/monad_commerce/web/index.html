@@ -1,0 +1,9 @@
+<!doctype html><html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Agentonomy · 预算采购台</title><link rel="stylesheet" href="/app.css"><script defer src="/app.js"></script></head>
+<body><header><a href="/">Agentonomy<span>Commerce</span></a><span class="mode">本地链 · Anvil</span></header>
+<main><section class="intro"><p class="eyebrow">授权一次，让每笔采购都有边界</p><h1>交给 Agent 的，<br>是一份有上限的预算。</h1><p>购买一份 CSV 对账报告，查看付款证据与交付结果。每份 0.30 TestUSD。</p><p class="note">本机测试账户 · 总额 1.00 · 单笔上限 0.50 · 测试资产无实际价值。交易在本地 EVM 执行，不是公共 Monad 测试网。</p></section>
+<aside class="budget"><h2>授权预算</h2><div class="balance"><strong id="remaining">—</strong><span>TestUSD 可用</span></div><div class="meter"><i id="meter"></i></div><dl><div><dt>已支付</dt><dd id="used">—</dd></div><div><dt>等待确认</dt><dd id="reserved">—</dd></div><div><dt>授权状态</dt><dd id="grant">读取中</dd></div></dl><button id="revoke" class="quiet">撤销后续采购授权</button><p id="revoke-status" class="note"></p></aside>
+<section class="work"><div class="heading"><h2>CSV 对账</h2><span>固定服务 · 0.30 TestUSD</span></div><label for="csv">交易记录</label><textarea id="csv" spellcheck="false" rows="7">transaction_id,date,description,amount,currency,category
+1,2026-10-03,Sale,10.00,USD,sales
+2,2026-10-03,Fee,-2.00,USD,fees</textarea><div class="actions"><button id="preview">查看本次报价</button><button id="execute" disabled>确认购买 · 0.30 TestUSD</button><button id="new" class="quiet">编辑新订单</button></div><p id="message" role="status" aria-live="polite">先确认输入。付款后若交付失败，可恢复原订单，无需再次付款。</p></section>
+<section class="result"><div class="heading"><h2>订单与结果</h2><span id="state">尚未创建订单</span></div><dl id="evidence"></dl><pre id="result">报告将在付款确认并交付后显示。</pre><button id="retry" class="quiet" disabled>查询／恢复同一订单</button></section>
+<footer>采购由用户签名授权约束；预算合约检查单笔、累计、期限与撤销状态。当前仅固定第一方测试商家。</footer></main></body></html>

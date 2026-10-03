@@ -146,3 +146,14 @@ test-review:
 
 test-submission:
 	PYTHONPATH=. $(PYTHON) -m pytest -q tests/commerce/test_submission_package.py
+
+.PHONY: test-monad monad-rehearsal
+
+test-monad:
+	cd contracts && forge build
+	PYTHONPATH=.:apps/facilitator:apps/core:apps/node $(PYTHON) -m pytest -q tests/monad
+	cd apps/core && $(PYTHON_ABS) -m pytest -q tests/test_onchain_spend_grant.py tests/test_budget_executor_recovery.py tests/test_budget_policy_migration.py
+
+monad-rehearsal:
+	cd contracts && forge build
+	PYTHONPATH=.:apps/node $(PYTHON) -m scripts.monad.rehearsal
