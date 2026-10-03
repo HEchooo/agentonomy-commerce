@@ -34,4 +34,4 @@ No public testnet deployment/transaction claimed.
 - Core independent verification accepted all five initial findings. Final integration review accepted paid-delivery recovery and identified public redaction, stale browser IDs and preflight boundary checks; those final fixes passed their focused and end-to-end gates.
 - Public wallet/signers, network deployment, license choice, canary and final submission remain pending user cooperation.
 - GitNexus staged change detection: 72 files, 5 affected execution flows, MEDIUM. Git diff confirms source changes scoped to new rail/composition and policy network migration.
-- Final candidate is ready for local fast-forward integration; merged-location smoke remains the final handoff gate.
+- Implementation commit `87f7538` was fast-forwarded into the original Commerce main checkout. Merged-location smoke passed: 71 Monad tests and 21 Core budget tests. Original untracked plan and verification/review logs are preserved under `.artifacts/monad-implementation/`. No remote push.

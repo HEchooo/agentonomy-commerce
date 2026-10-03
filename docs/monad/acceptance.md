@@ -67,3 +67,7 @@ Multiple agent code/spec reviews were performed; this is not a third-party audit
 A crash after a committed broadcast claim but before its outcome is known remains verification-only and may require manual investigation. It never creates a replacement payment. Public wallet onboarding/external signer composition must be wired and tested after the actual wallet and signing facility are selected; the ephemeral-key local launcher rejects public networks.
 
 Final review also tightened public Core attempt projection, stale local browser session handling and read-only preflight agreement on the same canonical finality boundary. These fixes passed the final 71-test Monad gate and 21-test Core budget gate.
+
+## Local repository handoff
+
+Implementation commit `87f7538` was fast-forwarded into the original `agentonomy-commerce` checkout. From that directory and its own virtual environment, `make PYTHON=.venv/bin/python test-monad` passed again: 71 Monad tests and 21 Core budget tests. The original plan and local evidence are retained under `.artifacts/monad-implementation/`. No remote push, public deployment or final submission occurred.
