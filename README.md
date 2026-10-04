@@ -15,6 +15,8 @@ verification and HTTP delivery. It is self-contained in this repository.
 Start with [the quickstart](docs/monad/quickstart.md),
 [acceptance record](docs/monad/acceptance.md), and
 [public deployment prerequisites](docs/monad/deployment.md).
+The [external OKX wallet and dedicated KMS operator path](docs/monad/kms-quickstart.md)
+adds bounded signing, wallet setup, and recovery of the original paid order.
 Public Monad deployment and wallet acceptance remain pending; the existing review
 service below continues to use explicitly simulated settlement.
 

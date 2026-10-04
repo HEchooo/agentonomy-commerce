@@ -38,11 +38,12 @@ def quote_commitment(quote_hash: str) -> str:
 class BudgetBackend:
     def __init__(self, config: NetworkConfig, *, relayer_address: str,
                  execution_signer_address: str, execution_sign: Callable,
-                 transaction_sign: Callable):
+                 transaction_sign: Callable, sign_execution: Callable | None = None):
         self.config = config
         self.relayer_address = address(relayer_address)
         self.execution_signer_address = address(execution_signer_address)
         self.execution_sign = execution_sign
+        self.sign_execution = sign_execution
         self.transaction_sign = transaction_sign
         self.clients = tuple(RpcClient(url, writable=(index == 0)) for index, url in enumerate(config.rpc_urls))
 
@@ -81,7 +82,9 @@ class BudgetBackend:
         )
         if execution.amount > grant.max_per_payment:
             raise ValueError("payment exceeds chain grant")
-        signature = self.execution_sign(hash_execution(execution, self.config.chain_id, self.config.executor))
+        signature = (self.sign_execution(grant, binding.owner_signature, execution)
+                     if self.sign_execution is not None else
+                     self.execution_sign(hash_execution(execution, self.config.chain_id, self.config.executor)))
         verify_execution_signature(execution, signature, self.execution_signer_address, self.config.chain_id, self.config.executor)
         data = encode_execute_calldata_hex(grant, binding.owner_signature, execution, signature)
         gas_price = quantity(self._checked("eth_gasPrice", []))

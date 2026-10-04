@@ -1,0 +1,109 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Agentonomy · Monad Testnet 钱包授权</title>
+  <link rel="stylesheet" href="/app.css">
+  <script defer src="/app.js"></script>
+</head>
+<body>
+  <header>
+    <a href="/">Agentonomy <span>Commerce</span></a>
+    <span class="mode">Monad Testnet · 10143</span>
+  </header>
+
+  <main>
+    <section class="intro">
+      <p class="eyebrow">外部钱包授权 · 明确点击每一步</p>
+      <h1>你的钱包，<br>你的预算边界。</h1>
+      <p>使用 OKX 注入钱包签名身份、业务预算和有限的 TestUSD allowance，再购买一份 CSV 对账报告。</p>
+      <p class="note">Monad Testnet 公共测试网 · TestUSD 六位精度 · 测试资产无货币价值 (no monetary value)。页面不会索要或保存私钥、助记词或签名。</p>
+      <div class="wallet-actions">
+        <button id="connect">连接 OKX 钱包</button>
+        <button id="switch-network" class="quiet">切换／添加 Monad Testnet</button>
+      </div>
+      <p id="wallet-help" class="note">请使用安装 OKX 扩展的浏览器打开此 localhost 页面。</p>
+    </section>
+
+    <aside class="status-card">
+      <div class="heading"><h2>部署状态</h2><span id="phase">读取中</span></div>
+      <dl>
+        <div><dt>钱包</dt><dd id="wallet-address">未连接</dd></div>
+        <div><dt>钱包网络</dt><dd id="wallet-chain">未连接</dd></div>
+        <div><dt>模式</dt><dd id="mode">—</dd></div>
+        <div><dt>配置 owner</dt><dd id="owner">—</dd></div>
+        <div><dt>chain ID</dt><dd id="chain">—</dd></div>
+        <div><dt>TestUSD</dt><dd id="token">—</dd></div>
+        <div><dt>Executor</dt><dd id="executor">—</dd></div>
+        <div><dt>Payee</dt><dd id="payee">—</dd></div>
+        <div><dt>Token balance</dt><dd id="balance">—</dd></div>
+        <div><dt>预算条款</dt><dd id="terms">—</dd></div>
+      </dl>
+    </aside>
+
+    <section class="onboarding">
+      <div class="heading"><h2>授权步骤</h2><span>当前阶段由 Core 返回</span></div>
+      <div class="steps">
+        <button id="wallet-verify" disabled>1 · 验证钱包身份</button>
+        <button id="grant-verify" disabled>2 · 签署业务预算</button>
+        <button id="budget-bind" disabled>3 · 绑定链上预算</button>
+        <button id="allowance-approve" disabled>4 · 授权 1.00 TestUSD</button>
+      </div>
+      <div class="allowance-recovery">
+        <label for="allowance-hash">已有 allowance 交易哈希（仅用于重试复验）</label>
+        <input id="allowance-hash" inputmode="text" autocomplete="off" placeholder="0x…">
+        <button id="allowance-verify" class="quiet" disabled>复验同一 allowance 交易</button>
+      </div>
+      <p id="allowance-status" class="note">未授权</p>
+    </section>
+
+    <section class="work">
+      <div class="heading"><h2>CSV 对账报告</h2><span>固定服务 · 0.30 TestUSD</span></div>
+      <label for="csv">交易记录</label>
+      <textarea id="csv" spellcheck="false" rows="7">transaction_id,date,description,amount,currency,category
+1,2026-10-03,Sale,10.00,USD,sales
+2,2026-10-03,Fee,-2.00,USD,fees</textarea>
+      <div class="actions">
+        <button id="preview" disabled>查看本次报价</button>
+        <button id="execute" disabled>确认购买 · 0.30 TestUSD</button>
+      </div>
+      <p id="message" role="status" aria-live="polite">正在连接本地会话……</p>
+    </section>
+
+    <section class="result">
+      <div class="heading"><h2>订单与结果</h2><span id="purchase-status">尚未创建订单</span></div>
+      <label for="purchase-id">订单 ID（查询同一订单）</label>
+      <input id="purchase-id" inputmode="text" autocomplete="off" placeholder="购买后显示">
+      <div class="actions">
+        <button id="purchase-query" class="quiet" disabled>查询当前订单</button>
+        <button id="purchase-recover" class="quiet" disabled>恢复同一订单交付</button>
+      </div>
+      <p>已付款但交付失败时，只恢复这个订单的交付，不会再次扣款。</p>
+      <pre id="result">报告将在付款确认并交付后显示。</pre>
+      <div id="tx-links" class="tx-links"></div>
+      <pre id="commerce">暂无订单快照</pre>
+    </section>
+
+    <section class="revoke">
+      <div class="heading"><h2>撤销授权</h2><span>Core 与链上分别确认</span></div>
+      <p>撤销会先由 Core 记录业务状态，再由钱包发送 executor 的 revoke 交易。两边都确认后才显示完成。</p>
+      <div class="actions">
+        <button id="revoke-prepare" class="quiet" disabled>准备撤销（Core 先行）</button>
+        <button id="revoke-chain" class="quiet" disabled>发送链上撤销</button>
+        <button id="revoke-verify" class="quiet" disabled>复验链上撤销</button>
+      </div>
+      <label for="revoke-hash">已有链上撤销哈希（仅用于重试复验）</label>
+      <input id="revoke-hash" inputmode="text" autocomplete="off" placeholder="0x…">
+      <dl>
+        <div><dt>Core 状态</dt><dd id="core-revoked">Core 未撤销</dd></div>
+        <div><dt>链上状态</dt><dd id="chain-revoked">链上撤销待确认</dd></div>
+      </dl>
+    </section>
+
+    <footer>
+      这是 Monad Testnet 的真实钱包授权流程，TestUSD 没有货币价值。所有签名和交易均需明确点击；钱包拒绝、账户变化或网络变化不会自动继续下一步。
+    </footer>
+  </main>
+</body>
+</html>
