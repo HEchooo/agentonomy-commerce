@@ -41,6 +41,10 @@ class Execute(Empty):
     preview_id: str = Field(min_length=1, max_length=160)
 
 
+class Recover(Empty):
+    csv_text: str | None = Field(default=None, min_length=1, max_length=131072)
+
+
 def create_app(*, origin='http://127.0.0.1:8091', runtime_factory):
     parsed = urlsplit(origin)
     if (parsed.scheme != 'http' or parsed.hostname not in {'127.0.0.1', 'localhost'}
@@ -143,8 +147,9 @@ def create_app(*, origin='http://127.0.0.1:8091', runtime_factory):
     @app.get('/api/purchases/{purchase_id}')
     def purchase(purchase_id: str): return public_purchase(invoke('request', 'purchase', {'purchase_id': purchase_id}))
     @app.post('/api/purchases/{purchase_id}/recover')
-    def recover_purchase(purchase_id: str, body: Empty):
-        return public_purchase(invoke('request', 'recover_purchase', {'purchase_id': purchase_id}))
+    def recover_purchase(purchase_id: str, body: Recover):
+        args = {'purchase_id': purchase_id, **body.model_dump(exclude_none=True)}
+        return public_purchase(invoke('request', 'recover_purchase', args))
     @app.post('/api/revoke/prepare')
     def revoke_prepare(body: Empty): return invoke('revoke_prepare')
     @app.post('/api/revoke/verify')

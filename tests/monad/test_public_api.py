@@ -94,9 +94,15 @@ def test_existing_purchase_recovery_has_no_replacement_preview_input(client):
     result = http.post('/api/purchases/order-1/recover', json={})
     assert result.status_code == 200
     assert runtime.calls == [('recover_purchase', {'purchase_id': 'order-1'})]
+    result = http.post('/api/purchases/order-1/recover', json={'csv_text': 'original'})
+    assert result.status_code == 200
+    assert runtime.calls[-1] == (
+        'recover_purchase',
+        {'purchase_id': 'order-1', 'csv_text': 'original'},
+    )
     result = http.post('/api/purchases/order-1/recover', json={'preview_id': 'replacement'})
     assert result.status_code == 422
-    assert len(runtime.calls) == 1
+    assert len(runtime.calls) == 2
 
 
 def test_real_rejected_wallet_hash_returns_409_and_status_allows_correction(client, tmp_path, monkeypatch):
