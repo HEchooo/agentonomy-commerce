@@ -1,0 +1,46 @@
+{
+  "observedDate": "2026-10-07",
+  "sources": [
+    "https://hackathon.monad.xyz/project?tab=submission",
+    "https://hackathon.monad.xyz/tracks/trust-identity-ai"
+  ],
+  "deadline": "2026-10-14T11:59:00+08:00",
+  "selectedTrack": "Trust, Identity & AI Infrastructure",
+  "required": [
+    "primary_track",
+    "project_logo",
+    "project_name",
+    "one_liner",
+    "description",
+    "go_to_market",
+    "github_repository",
+    "live_monad_product_url",
+    "technical_demo_video_url",
+    "pitch_video_url"
+  ],
+  "limits": {
+    "projectNameCharacters": 120,
+    "oneLinerCharacters": 200,
+    "descriptionCharacters": 8000,
+    "goToMarketCharacters": 8000,
+    "judgeAccessCharacters": 8000,
+    "technicalVideoSeconds": 180,
+    "pitchVideoSeconds": 120,
+    "logoMaxMbInForm": 2,
+    "logoMinPixels": 500,
+    "logoMaxPixels": 4000000
+  },
+  "logoConstraintNote": "The track page says 3 MB; use the stricter 2 MB upload-form limit.",
+  "repositoryAccess": "Public or shared with metropolis@hackathon.monad.xyz.",
+  "productNetwork": "Monad Mainnet or Testnet; clear judge access instructions.",
+  "technicalDemoContent": "Show the running product; a slide or source-code tour is insufficient.",
+  "judgingWeightsPercent": {
+    "technicalExecution": 20,
+    "developerDesignAndCraft": 20,
+    "originalityAndTrackInsight": 15,
+    "founderAndMarketReadiness": 25,
+    "tractionAndPathForward": 20
+  },
+  "licenseObservation": "No license field in the inspected form or explicit uniform-OSI condition in the selected track deliverables. General event terms and final declarations are not validated by this observation.",
+  "finalSubmissionPerformed": false
+}

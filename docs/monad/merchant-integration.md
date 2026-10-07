@@ -88,8 +88,8 @@ transaction_id,date,description,amount,currency,category
 
 添加新的商家或资源需要同时更新 Core allowlist、第一方 testnet policy、报价和 receipt scope，并补充独立测试。第三方 risk provider 未覆盖 Monad 时应拒绝常规付款，不能伪造 provider 结果或把测试网白名单写成生产风控。
 
-当前本地 composition 已通过真实 EVM、loopback HTTP delivery/replay、统一 MCP 和浏览器 UI 的联通路径；最终全回归及精确结果见 [`acceptance.md`](acceptance.md)。本地 `TestUSD` 结果的 `settlement_mode` 是 `local_anvil`，不应写成 simulated 或公共链结算。
+当前本地 composition 已通过真实 EVM、loopback HTTP delivery/replay、统一 MCP 和浏览器 UI 的联通路径；一笔公共 Monad 10143 付款及其 loopback merchant 交付、原订单恢复和同单 query replay 见 [`role-session-acceptance.md`](role-session-acceptance.md)。本地 Anvil composition 的结算标签为 `local_anvil`。现有公共 Monad canary 的原始 report 也保留这一历史商家字段，不修改已哈希报告；其真实付款模式依据外层已验证的 Monad receipt。当前 merchant endpoint 和 UI/API 仍只提供 loopback 服务。
 
 ## 公开接入状态
 
-当前没有已确认的公网 endpoint、测试网交易、外部开发者反馈或采用数据。公共 composition 仍是 local-only；真实 owner wallet、execution signer、relayer/gas signer、批准的资产和部署信息待用户提供或确认。loopback HTTP 和本地 Anvil 的测试可以说明组合边界和恢复语义，不能写成“商家已上线”“开发者已接入”或“Monad 已验证”。
+当前已有一笔已复验的测试网交易和交付证据，但没有公网 merchant/API endpoint、外部开发者反馈或采用数据。loopback HTTP merchant 和 public review service 仍不是公网商家上线；链上 revoke、录制、许可证选择和最终提交复核仍待完成。不能把这笔单独的 canary 写成“开发者已接入”或生产服务证据。

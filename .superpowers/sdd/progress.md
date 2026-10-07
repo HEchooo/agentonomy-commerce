@@ -6,7 +6,7 @@ Worktree: /private/tmp/agentonomy-commerce-monad-20261003.
 
 ## Constraints
 - Standalone copied runtime; no sibling Clink runtime imports.
-- No public-chain broadcasts, production changes, final submission or license grant.
+- Original Oct3 constraint: no public broadcasts before later scope approval. Oct7 approved bounded Monad Testnet deployment/payment supersedes that portion; no Clink production changes, final submission or license grant.
 - Root owns architecture/security/integration/final acceptance. Bounded Luna workers own disjoint files.
 - New EIP712 protocol frozen in docs/monad/design.md. Changes require coordinated review.
 
@@ -21,10 +21,11 @@ Worktree: /private/tmp/agentonomy-commerce-monad-20261003.
 - [x] Local complete-loop and failure/recovery tests.
 - [x] Independent spec and quality reviews.
 - [x] Complete relevant regressions and deployment/material preparation.
-- [ ] Public Monad acceptance (requires user later).
+- [ ] Full public product acceptance (actual HTTPS multi-wallet product, revoke/refusal and videos).
 
-## Evidence
-No public testnet deployment/transaction claimed.
+## Evidence — pre-2026-10-07 historical baseline
+At this historical checkpoint no public testnet deployment/transaction was claimed.
+The dated Oct7 continuation entries below supersede these pending statements.
 - Contracts 54 passed, invariant 128,000 calls.
 - Existing Commerce 16, Review 76, submission 6, workspace 12, Node 841 (1 PostgreSQL skip), E2E 2, Hosted 522 (4 PostgreSQL skips), Marketplace 320 and 16 prediction smoke scripts passed.
 - Full Core 2,116 passed; final focused budget 21 passed.
@@ -56,3 +57,14 @@ This entry supersedes the earlier zero-balance and no-public-deployment status.
 - Intermittent read failures during live verification were diagnosed at the RPC eth_call boundary. Commit b160618 adds at most three attempts for read-only RPCs, preserving one attempt for broadcasts and all verification checks. TDD,282 Monad,16 Commerce and21 Core budget/recovery/migration passed; independent review APPROVE. GitNexus staged scope two files, zero affected processes, LOW.
 - Actual private runtime configuration was generated from complete deployment records. The loopback operator UI at http://127.0.0.1:8091/ is running from the main checkout, state preserved in the existing private run directory. Browser shows expected owner/chain/contracts and wallet phase without JS errors.
 - Still pending: user OKX identity/mandate/EIP712/finite1.00TestUSD approval, actual0.30 purchase+delivery, same-order recovery/restart and revocation proof. Public review site remains simulated. Do not claim full public acceptance or record the final demo yet.
+
+## 2026-10-07 delivered purchase and saved submission draft
+This entry supersedes earlier wallet/payment-pending statements, which remain historical.
+- The OKX owner completed identity, mandate, signed grant and finite 1.00 TestUSD approve. Actual MCP initiated one 0.30 payment; successful receipt block 68984424 verified through both public RPCs/Core watcher.
+- Original purchase `purchase_739a74c933eb` recovered after a transport interruption and delivered one CSV report (income10/expense2/net8). API recovery/query replay and MCP purchase/status reads passed; used0.30/reserved0/remaining0.70, deliveries1. Relayer pending nonce3 includes two CREATEs and one purchase, not three payments. A second MCP execute was not performed.
+- Commit 4db0ff5 bounds real-rail timeouts; 59bbeeb persists original paid input for recovery; 32f0211 gates verified receipt UI and preserves original order/report. Full related gate: Monad287/Core21/Commerce25/Review76/submission6; final focused UI/API/submission21 passed. No application code changed during the later materials pass.
+- Monad login succeeded. Description/access instructions saved at 2026-10-07T15:22Z; exact copy in submission/monad/form-saved.json. Deadline Oct14 11:59 GMT+8, track Trust, Identity & AI Infrastructure, checklist3/5. No final submission.
+- Read-only GCP check confirms the independent review VM RUNNING, e2-medium, IP34.21.234.127. No remote change. Actual Monad UI/API/merchant remain loopback; public review still simulated. Required real HTTPS product and two hosted video URLs remain empty.
+- Remaining: chosen public access mode and deployment; owner onchain revocation/refusal while balance remains; recording; license/rule review; final user review. Do not revoke current grant or pay another order just for material cleanup.
+
+- Later user steering: reviewers must use their own wallets. Website wallet login → bounded consent → OPC installation/short-lived credential flow is being discussed. Root confirmed the copied OPC service uses 300-second access credentials and 10-minute pairing; the current Monad fixed-owner adapter is not yet that public OPC flow. See docs/monad/public-live-readiness.md.

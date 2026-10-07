@@ -1,12 +1,12 @@
 # External OKX wallet and dedicated KMS acceptance
 
 This is an operator-run **Monad testnet** path. The public wallet supplies its
-own signatures; the application never receives its private key. Public chain
-acceptance remains pending: a passing local test is not a Monad transaction.
-Both contracts were deployed and independently verified on October 7; see the
-[live deployment evidence](role-session-acceptance.md). Owner wallet setup and
-purchase acceptance remain pending. The existing review website is a separate
-deployment and is not upgraded by starting this command.
+own signatures; the application never receives its private key. As of
+2026-10-07, both contracts, owner wallet setup, one `0.30 TestUSD` payment and
+same-order delivery/recovery were verified; see the [live
+deployment evidence](role-session-acceptance.md). Chain revocation, recording,
+license choice and final submission remain pending. The existing review website
+is a separate deployment and is not upgraded by starting this command.
 
 ## Scope and prerequisites
 
@@ -33,7 +33,8 @@ forge build --root contracts
 make PYTHON=.venv/bin/python test-monad
 ```
 
-The read-only deployment planner prints two concrete legacy CREATE transactions:
+For a fresh, separately approved deployment, the read-only deployment planner
+prints two concrete legacy CREATE transactions:
 fixed-supply TestUSD minted to the buyer, then the budget executor. It includes
 artifact hashes, predicted addresses, nonce and maximum gas cost. Replace the
 example nonce and gas price with fresh, independently checked values:
@@ -74,7 +75,10 @@ The first CREATE must be Verified before the second is signed. Only `complete`
 means both creations have been independently verified. A later read-only run
 rechecks historical deployment evidence even after the buyer has spent tokens.
 
-The journal contains signed raw bytes and must stay private. Public output is
+Do not rerun or broadcast the already-completed deployment merely to reproduce
+this document; use the recorded transaction hashes and code hashes for the
+current acceptance. The journal contains signed raw bytes and must stay private.
+Public output is
 limited to transaction hashes, contract addresses, code hashes and verification
 state. Store actual confirmed addresses and code hashes in the runtime manifest
 only after `complete`; predicted addresses alone are insufficient.
@@ -160,4 +164,6 @@ PYTHONPATH=.:apps/core:apps/node .venv/bin/python \
 This stdio process exposes the existing service search, preview, execution and
 purchase-status tools through `clink_node`; it cannot issue owner signatures or
 arbitrary KMS requests. Agents keep the original preview/purchase references when
-resuming an order. Final local verification is recorded in [kms-acceptance.md](kms-acceptance.md).
+resuming an order. The historical local verification is recorded in
+[kms-acceptance.md](kms-acceptance.md); current public facts are in
+[role-session-acceptance.md](role-session-acceptance.md).

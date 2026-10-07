@@ -2,8 +2,14 @@
 
 Run date: 2026-10-04. Base: `335d47f`, branch `codex/monad-kms`.
 
-This record covers the new external-wallet/operator composition. Public Monad
-acceptance is **pending**. No public contract creation or payment was broadcast.
+This is an **as-of 2026-10-04 pre-live KMS acceptance record**. The later
+deployment, OKX setup, verified payment and recovery evidence is recorded in
+[`role-session-acceptance.md`](role-session-acceptance.md).
+
+This record covers the new external-wallet/operator composition. As of this
+record, public Monad acceptance was **pending** and no public contract creation
+or payment had been broadcast. Its local and KMS permission results remain
+historical engineering evidence, separate from the later public receipt.
 KMS primitive tests use fake provider responses with real secp256k1 DER
 signatures; integration tests execute real contracts on local Anvil. These are
 different evidence from a successful AWS `kms:Sign` request or Monad receipt.
@@ -58,9 +64,10 @@ symbols and 26 affected flows at critical risk; the changed paths are confined
 to the reviewed Commerce integration, tests and documentation. No Clink source
 or production configuration was changed.
 
-## Public prerequisites, checked separately
+## Public prerequisites, checked separately (as of 2026-10-04)
 
-Both buyer and relayer had zero test MON and pending nonce zero on two RPCs.
+At the time of this record, both buyer and relayer had zero test MON and pending
+nonce zero on two RPCs.
 The official faucet was left at its verification step with the buyer address
 entered. No token claim succeeded. The read-only deployment plan is blocked by
 insufficient funding; its two CREATE transactions have a combined maximum cost
@@ -68,14 +75,14 @@ of 0.8 test MON at the selected 200 gwei cap and 2,000,000 gas per transaction.
 Payment and wallet-operation gas are additional. All quotes/nonces must be
 rechecked before executing the saved plan.
 
-The two dedicated KMS keys exist, but the operator's `kms:Sign` request was
+At the time of this record, the two dedicated KMS keys existed, but the operator's `kms:Sign` request was
 denied. AWS also denied the approved narrow policy installation because the
 operator lacks `iam:PutUserPolicy`. No policy was applied. The private
 administrator handoff remains outside version control. This permission issue
 is independent of temporary credential expiry or KMS key migration.
 
-Remaining sequence: administrator enables exact-key signing, test MON arrives,
-verify live KMS/public keys, review the concrete deployment scope, deploy and
-check both code hashes, then have the buyer perform OKX signatures and finite
-approval. Finally retain actual dual-RPC Monad payment, delivery, replay and
-revocation evidence. See [the operator quickstart](kms-quickstart.md).
+The later role-session acceptance completed the deployment, live KMS/public-key
+checks, OKX setup, finite approval, dual-RPC payment verification, delivery and
+same-order recovery/query replay. Chain revocation, recording, license choice
+and final submission review remain pending. See [the operator quickstart](kms-quickstart.md)
+and [`role-session-acceptance.md`](role-session-acceptance.md).

@@ -1,6 +1,6 @@
 # Monad 预算支付轨道：部署与验收
 
-状态：本地 EVM/HTTP/MCP/UI 验收已完成；公共部署前草稿。当前没有已确认的 Monad 测试网代币、执行合约、收款方或交易地址，真实 owner wallet、execution signer 和 relayer/gas signer 也待用户提供或确认。文档中的广播步骤只能在用户明确确认网络、资产、地址、Gas 和签名范围后执行。
+状态（截至 2026-10-07）：本地 EVM/HTTP/MCP/UI 验收已完成；Monad 测试网的两个合约已部署并通过双 RPC 复验，一笔用户授权的 0.30 TestUSD 付款已在 chain 10143 验证并交付，原订单 API recovery 和同单 query replay 也已完成。预算为 used 0.30、reserved 0、remaining 0.70 TestUSD。当前 live 证据见 [`role-session-acceptance.md`](role-session-acceptance.md)。operator UI/API 与 merchant 仍只绑定 loopback，public review service 仍是模拟；链上 revoke、视频录制、许可证选择和最终提交表仍待完成。
 
 ## 网络配置
 
@@ -11,17 +11,17 @@
 
 该 `finalized - 3` 规则来自 [Monad block states](https://docs.monad.xyz/monad-arch/consensus/block-states)，并在代码中标记为需随网络升级重新核对的版本化事实。不能把普通确认数、单个 `finalized` 标签或 Polygon 的确认规则替代它。Watcher 对本地和公共模式都要求每份观察提供与 receipt 一致的 canonical block，以及独立读取的 `finality.canonical_block`；两条 RPC 必须对 chain ID、交易、receipt、事件和同一个最终性边界块给出一致证据。
 
-Monad 测试网资料入口是 [Monad testnet](https://docs.monad.xyz/developer-essentials/testnet)。2026-10-03 的只读核查能读取 `0x279f` 和 `finalized`，没有广播交易。目标测试代币地址目前未知，不能从旧链地址、合约 fixture 或“USDC”名称推断。
+Monad 测试网资料入口是 [Monad testnet](https://docs.monad.xyz/developer-essentials/testnet)。2026-10-03 的只读核查是没有广播交易的历史预检；当前部署地址、交易和双 RPC 付款证据见 [`role-session-acceptance.md`](role-session-acceptance.md)。仍不能从旧链地址、合约 fixture 或“USDC”名称推断公共资产，也不能把自部署 TestUSD 称为官方 USDC。
 
 ## 先决条件
 
 - Python 3.12、项目锁定依赖和一个独立虚拟环境；Foundry 的 `forge` 和本地 `anvil` 只用于本地验证。
 - 已明确的网络、chain ID、token 地址、token 代码哈希、六位精度、执行合约地址、固定 payee 地址和两个独立 RPC。
-- owner 钱包可以签署 grant 并设置仅针对执行合约的有限 ERC-20 allowance；execution signer 可以签署一笔订单许可；relayer 只持有 gas 能力。公共模式的这三个真实 signer 由用户提供或确认，当前仍未完成接线。
+- owner 钱包、execution signer 和 relayer 的公共测试网接线已在当前 role session 中完成一次受控 canary；owner grant、EIP-712 grant 和有限 allowance 的证据见 [`role-session-acceptance.md`](role-session-acceptance.md)。签名材料仍只能由钱包或受控签名系统管理，链上 revoke 仍需用户完成。
 - 所有签名、私钥、助记词和 RPC 凭据由钱包或受控签名系统管理，不写入仓库、manifest、日志、MCP 响应或截图。部署脚本本身不读取私钥。
 - 经过用户确认的预算上限、付款次数、Gas 上限、测试资产范围和收款方。
 
-公共模式的配置模型要求显式 `monad_testnet`、`eip155:10143`、`token_decimals=6` 和两个独立的 HTTPS URL；缺项时应 fail closed。当前没有地址，所以公共模式只能停在预检。
+公共模式的配置模型要求显式 `monad_testnet`、`eip155:10143`、`token_decimals=6` 和两个独立的 HTTPS URL；缺项时应 fail closed。当前已确认的配置和部署证据以 [`role-session-acceptance.md`](role-session-acceptance.md) 为准，不能用本地 fixture 或旧配置替代。
 
 ## 本地 Anvil rehearsal
 
@@ -39,7 +39,7 @@ PYTHONPATH=.:apps/node:apps/core:apps/facilitator \
   .venv/bin/python -m pytest -q tests/monad
 ```
 
-当前本地 EVM composition 的 Core/Marketplace/watcher、真实合约、loopback HTTP delivery/replay、统一 MCP 和浏览器 UI 路径已通过。全回归的命令和最终结果见根拥有的 [`acceptance.md`](acceptance.md)；不要在本页复制旧的临时计数或环境失败。
+当前本地 EVM composition 的 Core/Marketplace/watcher、真实合约、loopback HTTP delivery/replay、统一 MCP 和浏览器 UI 路径已通过。旧的本地回归计数见有日期的 [`acceptance.md`](acceptance.md)，当前 live 部署、付款和恢复事实见 [`role-session-acceptance.md`](role-session-acceptance.md)；不要把本地结果写成公网服务已上线。
 
 本地测试的 `TestUSD` 是没有现实价值的本地测试资产，composition 明确标记 `real_funds=false` 且 `settlement_mode=local_anvil`。本地成功不能证明 Monad 部署、官方 USDC、主网资金或外部采用。
 
@@ -93,7 +93,7 @@ forge script --root contracts script/DeployAgentonomyBudgetExecutor.s.sol:Deploy
 
 ## Core、Watcher 与商家配置
 
-部署地址确认后，Core 的预算 profile 才能填写：
+部署地址确认后的 Core 预算 profile 必须持续匹配以下字段：
 
 - `budget_mode=monad_testnet`、`budget_network=eip155:10143`、`budget_chain_id=10143`；
 - 两个 HTTPS RPC；token、executor、payee 地址和六位精度；
@@ -105,7 +105,7 @@ Core 先检查身份、既有 Spending Grant、scope、policy/risk 和预算预�
 
 ## Canary 验收与证据
 
-公共测试网 canary 只能在明确批准的 token、payee、金额和次数内执行。至少保存以下脱敏证据：
+当前已完成一笔明确批准的公共测试网 canary；后续 canary 仍只能在明确批准的 token、payee、金额和次数内执行。至少保存以下脱敏证据：
 
 - chain ID、RPC 检查时间、token/executor/payee 地址和代码哈希；
 - owner grant 的字段摘要、grant hash、execution hash 和 allowance 范围；
@@ -114,7 +114,7 @@ Core 先检查身份、既有 Spending Grant、scope、policy/risk 和预算预�
 - Core 预算使用前后值、订单状态和商家交付输入/输出摘要；
 - 撤销、重复订单、超额或错误收款方的拒绝证据（不得用新订单掩盖未知状态）。
 
-不要上传 owner/execution/relayer 私钥、原始 CSV、完整 receipt 中不必要的个人数据、RPC 凭据或执行服务密钥。没有真实交易和商家证据时，提交材料应明确写“公共验收待完成”。
+不要上传 owner/execution/relayer 私钥、原始 CSV、完整 receipt 中不必要的个人数据、RPC 凭据或执行服务密钥。本次真实付款和 loopback merchant 交付证据已记录；若后续运行缺少真实交易或商家证据，提交材料仍应明确写“公共验收待完成”，不能用本地结果补位。
 
 ## 未知状态、失败和停止
 

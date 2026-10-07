@@ -1,6 +1,6 @@
 # Monad 预算支付轨道：来源与基线
 
-状态：本地 Anvil/EVM、loopback HTTP、统一 MCP 和浏览器 UI 验收已完成；完整相关回归已通过，公共 Monad 测试网验收待完成（2026-10-03）。本文是材料基线，不是部署证明、审计报告或提交资格结论。
+状态（截至 2026-10-07）：本地 Anvil/EVM、loopback HTTP、统一 MCP 和浏览器 UI 验收已完成；一笔 Monad 测试网 10143 的 0.30 TestUSD 付款已通过双 RPC 验证并交付，原订单 API recovery 和同单 query replay 已记录在 [`role-session-acceptance.md`](role-session-acceptance.md)，预算 remaining 为 0.70 TestUSD。本文保留 2026-10-03 的来源基线，不是部署证明、审计报告或提交资格结论；operator UI/API 与 merchant 仍是 loopback，public review service 仍是模拟。
 
 ## 来源快照
 
@@ -30,25 +30,25 @@
 
 ## 网络与资产事实
 
-Monad 测试网的只读核查记录为 chain ID `0x279f`（十进制 `10143`）。本次使用的官方资料入口是 [Monad testnet 文档](https://docs.monad.xyz/developer-essentials/testnet) 和 [Monad block states 文档](https://docs.monad.xyz/monad-arch/consensus/block-states)。已知 RPC 入口为 `https://testnet-rpc.monad.xyz` 与 `https://rpc-testnet.monadinfra.com`；2026-10-03 的核查能读取 `finalized`，但没有广播交易。
+Monad 测试网的只读核查记录为 chain ID `0x279f`（十进制 `10143`）。本次使用的官方资料入口是 [Monad testnet 文档](https://docs.monad.xyz/developer-essentials/testnet) 和 [Monad block states 文档](https://docs.monad.xyz/monad-arch/consensus/block-states)。已知 RPC 入口为 `https://testnet-rpc.monad.xyz` 与 `https://rpc-testnet.monadinfra.com`；2026-10-03 的核查能读取 `finalized` 但没有广播交易，这是本基线的历史预检。当前部署和付款证据见 [`role-session-acceptance.md`](role-session-acceptance.md)。
 
-公共测试网的目标代币、执行合约和收款方地址目前都没有确定，也没有公共交易哈希或商家公网地址。仓库中的 `AgentonomyTestUSD`/`BudgetTestUSD` 是测试资产；自部署 `TestUSD` 不能称为官方 USDC。任何地址、字节码哈希、余额、交易和部署状态都必须在部署前重新读取，不能从本地测试 fixture 推断。
+本基线创建时，公共测试网的目标代币、执行合约和收款方地址尚未确定；当前部署地址、代码哈希、付款交易和双 RPC 证据见 [`role-session-acceptance.md`](role-session-acceptance.md)。商家公网地址仍未提供，当前 merchant 只经 loopback HTTP 运行。仓库中的 `AgentonomyTestUSD`/`BudgetTestUSD` 是测试资产；自部署 `TestUSD` 不能称为官方 USDC。任何地址、字节码哈希、余额、交易和部署状态都必须从当前独立证据读取，不能从本地测试 fixture 推断。
 
 ## 验证记录
 
 当前本地 EVM composition 已通过真实合约执行、Core/Marketplace/watcher、loopback HTTP merchant delivery/replay、统一 `clink_node` MCP 和浏览器 UI 路径；结果中的 `settlement_mode` 为 `local_anvil`，不代表公共链。合约命令统一从仓库根目录使用 `forge build --root contracts`、`forge fmt --root contracts --check` 和 `forge test --root contracts`。
 
-最终全回归及其精确结果只记录在根拥有的 [`acceptance.md`](acceptance.md)；本材料不重复旧的临时计数，也不把局部通过写成全仓验收通过。
+2026-10-03 基线全回归记录在 [`acceptance.md`](acceptance.md)；2026-10-07 的最新相关回归及公共测试网证据记录在 [`role-session-acceptance.md`](role-session-acceptance.md)。本材料不把历史计数冒充最新结果，也不把局部通过写成全仓验收通过。
 
-## 进入公共验收前必须补齐
+## 公共验收后仍需补齐或持续核对
 
-1. 由用户提供并核验 Monad 测试网代币地址、六位精度、代码哈希、执行合约地址、收款方地址和两个独立 HTTPS RPC。
-2. 由用户提供或确认真实 owner wallet、execution signer 和 relayer/gas signer，完成一次明确范围的 owner grant、有限 allowance、撤销和 canary 付款；私钥始终留在用户控制的钱包或受控签名器中。
-3. 记录同一交易在两条 RPC 上的 receipt、canonical block、`Verified` 边界、`PaymentExecuted`/`Transfer` 日志、Core 预算前后值和商家交付结果。
+1. 持续从 [`role-session-acceptance.md`](role-session-acceptance.md) 核对 Monad 测试网代币、六位精度、代码哈希、执行合约、收款方和两个独立 HTTPS RPC；网络或代码变更后重新读取。
+2. owner wallet、execution signer、relayer/gas signer、owner grant、有限 allowance 和一笔 canary 付款已完成一次受控验收；用户仍需完成链上 revoke 并记录新付款被拒绝的证据。私钥始终留在用户控制的钱包或受控签名器中。
+3. 同一交易在两条 RPC 上的 receipt、canonical block、`Verified` 边界、`PaymentExecuted`/`Transfer` 日志、Core 预算前后值和 loopback merchant 交付结果已记录在 [`role-session-acceptance.md`](role-session-acceptance.md)。
 4. 在网络变更、工具升级或 Monad 最终性规则变化后重新核对 `finalized - 3` 的适用性。
 5. 用户已授权可提交的第一方代码（不包括私钥和凭据），团队身份 Agentonomy 与联系邮箱已记录；剩余许可事项只有是否采用统一 OSI 许可证的实际选择。现有 Logo 仅按源文件 provenance 记录，不在此声明其许可。
 
-在上述公共证据出现前，项目状态应继续写成“本地实现和测试网适配草稿”，而不是“已部署”“已上线”“已审计”或“已被采用”；本地 EVM 通过也不改变这一边界。
+当前状态可以写成“已完成一笔受双 RPC 复验的 Monad testnet canary，并完成同单恢复/交付”；仍不能写成“公网商家/API 已上线”“已审计”或“已被采用”。本地 EVM 通过和 loopback merchant 交付仍不能替代公网服务证据。
 
 ## 本次复用与同步取舍
 

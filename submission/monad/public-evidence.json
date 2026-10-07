@@ -1,0 +1,106 @@
+{
+  "project": "Agentonomy Commerce",
+  "team": "Agentonomy",
+  "evidenceDate": "2026-10-07",
+  "implementationCommit": "32f0211dc4efc0c602c990b4171da67cc51f0eb3",
+  "sourceRepository": "https://github.com/HEchooo/agentonomy-commerce",
+  "mode": "monad_testnet",
+  "chainId": 10143,
+  "testAsset": {
+    "symbol": "TestUSD",
+    "decimals": 6,
+    "address": "0x6f36d16b27713f7b1a7e1d2773420fca9fd494c9",
+    "hasMonetaryValue": false,
+    "isOfficialUsdc": false,
+    "deploymentTransaction": "0x441be12ebb19c739b041898ceb2780e6317103d4dbd20492e9462e638bfa676b"
+  },
+  "executor": {
+    "address": "0x391b21c017d8938820c5744ac70603857df8970c",
+    "deploymentTransaction": "0x5a9dd34eb22039218f9af880d838fc1370487079656533bde05f24fa65c61016"
+  },
+  "owner": "0x59899831691aa79507818961773497c751bffc8b",
+  "payee": "0xbdcb39ac5ff83485cb35160f0ddaa0b7446ee009",
+  "finiteAllowance": {
+    "amount": "1.00",
+    "transactionHash": "0xed3026bccfca3d9edebd9bde03aa674cf102c6f41dae03125e8c1e8812c5dbeb",
+    "blockNumber": 68981135,
+    "verified": true
+  },
+  "purchase": {
+    "previewId": "preview_739a74c933eb",
+    "purchaseId": "purchase_739a74c933eb",
+    "state": "delivered",
+    "amount": "0.30",
+    "amountAtomic": "300000",
+    "transactionHash": "0x2711ae051fbf132e544e984c11db6b3b8b518caa40a70d380520743159408037",
+    "explorerUrl": "https://testnet.monadexplorer.com/tx/0x2711ae051fbf132e544e984c11db6b3b8b518caa40a70d380520743159408037",
+    "receiptStatus": 1,
+    "blockNumber": 68984424,
+    "verified": true,
+    "twoRpcVerified": true,
+    "finalityKind": "monad_verified",
+    "inputHash": "0x328cd8c29321f7cccfe7b971af18c62f601ece87b30730bf2c084563d2fa39b9",
+    "outputHash": "0x12f2f322a22b05deb897b33c0d5c7a1e10060ad79ef70b9967b526e30bdd89be"
+  },
+  "recovery": {
+    "evidenceState": "delivered_and_replayed",
+    "sameOrderSamePayment": true,
+    "apiRecoveryReplayPassed": true,
+    "sameOrderQueryReplayPassed": true,
+    "mcpPurchaseQueryPassed": true,
+    "secondMcpExecuteReplayTested": false,
+    "usedAmount": "0.30",
+    "reservedAmount": "0.00",
+    "remainingAmount": "0.70",
+    "merchantDeliveries": 1,
+    "relayerPendingNonce": 3,
+    "nonceMeaning": "Two deployment transactions plus one purchase transaction; not three purchases."
+  },
+  "report": {
+    "inputRows": 2,
+    "currency": "USD",
+    "income": "10.00",
+    "expense": "2.00",
+    "net": "8.00",
+    "historicalMerchantEnvironmentLabel": "local_anvil",
+    "labelNote": "The original hashed merchant report is preserved. Actual payment mode is determined by the verified outer Monad receipt, not this historical label."
+  },
+  "service": {
+    "transport": "loopback_http",
+    "reviewerAccessibleLiveMonadApi": null,
+    "publicReviewUrl": "https://review.agentonomy.xyz/",
+    "publicReviewSettlementMode": "simulated"
+  },
+  "pending": [
+    "reviewer_accessible_live_monad_https_product",
+    "live_owner_wallet_revocation_acceptance",
+    "technical_video_url",
+    "pitch_video_url",
+    "user_final_review_and_final_submission"
+  ],
+  "claims": {
+    "mainnet": false,
+    "productionReadiness": false,
+    "thirdPartySecurityAudit": false,
+    "externalAdoptionRecorded": false
+  },
+  "submissionDraft": {
+    "savedAt": "2026-10-07T15:22:00Z",
+    "deadline": "2026-10-14T11:59:00+08:00",
+    "primaryTrack": "Trust, Identity & AI Infrastructure",
+    "checklistCompleted": 3,
+    "checklistTotal": 5,
+    "finalSubmissionPerformed": false
+  },
+  "licensing": {
+    "uniformFirstPartyLicenseGranted": false,
+    "requiredLicenseFieldObserved": false,
+    "generalTermsAndFinalDeclarationsChecked": false
+  },
+  "publicProductPlan": {
+    "reviewerUsesOwnWallet": true,
+    "websiteWalletLoginAndOpcBindingImplemented": false,
+    "testAssetFixedSupply": "1.00",
+    "publicTestAssetFaucetExists": false
+  }
+}

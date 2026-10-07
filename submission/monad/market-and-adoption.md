@@ -1,6 +1,17 @@
 # Market and adoption plan
 
-This is a hypothesis and measurement plan. It does not report customers, revenue, partnerships, or external developer usage; none is recorded in the current materials.
+This is a hypothesis and measurement plan. An owner-controlled Monad testnet
+canary is now complete, but it does not report customers, revenue, partnerships,
+or external developer usage; none is recorded in the current materials.
+
+## Current canary evidence
+
+The completed canary used one owner-authorized `0.30 TestUSD` payment on chain
+`10143`. The receipt was verified through two RPC observations, the CSV report
+was delivered once, and the original order was recovered and queried again
+without another payment. The API and merchant ran over loopback HTTP; the
+public review site remains a separate simulation. This is internal acceptance
+evidence for the payment and recovery boundary, not external adoption.
 
 ## Initial user and job
 
@@ -30,7 +41,8 @@ This must be tested with conversations and runnable integrations. It is not infe
 2. Give a developer one fixed offering, one grant schema, a local Anvil recipe, and a small client that uses `preview -> execute -> result`.
 3. Ask external developers to attempt one purchase, one replay, and one failure recovery; record the exact environment and errors.
 4. Fix documentation and protocol friction, then repeat with a second merchant-shaped service only after the first path is understandable.
-5. When public Monad evidence is available, provide a read-only transaction and finality proof; do not require a developer to receive internal review credentials.
+5. For the completed Monad canary, provide a read-only transaction and finality
+   proof; do not require a developer to receive internal review credentials.
 
 Potential distribution channels are the source repository, the `clink_node` MCP ecosystem, agent framework examples, and direct developer trials. No outreach or external messaging has been performed by this draft.
 
@@ -50,8 +62,15 @@ Do not publish a conversion rate, integration time, satisfaction score, customer
 
 ## Near-term sequence
 
-- **Before public canary:** retain the passing local EVM HTTP/MCP/UI evidence, run the final broad regression recorded in [`acceptance.md`](../../docs/monad/acceptance.md), verify the official network facts, choose a test asset, and confirm the approved owner wallet, execution signer, relayer/gas signer, token, executor, and payee.
-- **Public canary:** deploy only the approved token/executor/payee combination, run the approved small payment range, and save two-RPC and merchant evidence. Keep the local Anvil/TestUSD composition visibly separate from public-chain evidence.
+- **Canary evidence package (complete):** retain the passing local EVM
+  HTTP/MCP/UI evidence alongside the owner-controlled Monad payment, its
+  two-RPC proof, delivery result and same-order recovery evidence. Keep the
+  local Anvil/TestUSD composition visibly separate from public-chain evidence.
+- **Public product endpoint:** the user chose a reviewer-accessible own-wallet
+  HTTPS product path. Website wallet login, OPC binding and account isolation
+  are under design review; the actual purchase UI/API remains loopback and the
+  public review site remains simulated. Do not claim the multi-wallet product
+  is deployed before its acceptance passes.
 - **Developer trial:** ask a small number of external developers to run the quickstart and fill the feedback form. Record invitations and results separately; internal tests are not external adoption.
 - **Iteration:** prioritize failures that affect authorization clarity, idempotency, payment evidence, or recovery before adding more services or networks.
 

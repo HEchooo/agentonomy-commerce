@@ -1,15 +1,36 @@
 # Two-minute pitch script
 
-“Agents are good at finding services, but giving an agent a spending budget still leaves a hard question: what exactly can it pay for, and how do we know a retry will not pay twice?
+“An Agent can find a useful service, but giving it an unrestricted wallet is a
+bad payment boundary. Agentonomy Commerce lets an Agent buy one fixed service
+inside a budget a user can inspect and revoke.
 
-Agentonomy Commerce makes that boundary explicit. Core remains the control plane for wallet identity, the existing signed Spending Grant, policy and risk, budget reservations, execution, and audit. For the payment rail, the user signs an EIP-712 budget grant that fixes the token, merchant payee, agent scope, per-payment limit, total limit, validity window, and execution signer. Core signs a second permit for one frozen quote and one purchase ID. An ordinary ERC-20 executor checks both signatures, revocation, replay state, and exact transfer amounts on chain.
+Core stays in charge of wallet identity, the signed Spending Grant, policy and
+risk, budget reservation, execution and audit. The user signs a bounded EIP-712
+grant that fixes the token, payee, Agent scope, validity window, execution
+signer, `0.50` per-payment limit and `1.00` total limit. Core then authorizes
+one frozen quote and purchase ID. The ordinary ERC-20 BudgetExecutor checks the
+signatures, caps, revocation and replay state. The Monad adapter adds the chain
+verification path; it does not create a second wallet ledger.
 
-The result is a purchase flow that can be inspected by a user and a developer. A Marketplace preview freezes the CSV input and a 0.30 local TestUSD price. Core reserves the budget, the contract enforces the signed ceiling, and the watcher independently checks the transaction, the `PaymentExecuted` and `Transfer` events, the receipt's canonical block, and the same explicit finality boundary through two RPC observations. The merchant receives a signed settled receipt and the same frozen input. If delivery fails, the system retries delivery; it does not charge a second time. If the chain result is unknown, it keeps the original reservation and asks the operator to inspect the original transaction.
+We have a verifiable testnet result. On Monad chain `10143`, both contracts were
+deployed and checked through two RPC observations. The owner-approved flow made
+one `0.30 TestUSD` payment in block `68984424`. The payment transaction, receipt
+and two-RPC proof are shown on screen. The CSV report was delivered once, and
+the same order was recovered and queried again without a second payment. The
+remaining budget is `0.70 TestUSD`.
 
-The design is deliberately narrow. It uses a normal ERC-20 contract, with no EIP-7702 requirement, generic arbitrary-call API, or claim that a test token is official USDC. It keeps business authorization in Core instead of creating a second wallet ledger. The local composition now exercises the protocol and recovery path with real Anvil EVM transactions and loopback HTTP. That local proof is clearly labelled `local_anvil`; it is not a Monad deployment.
+That recovery behavior is the product point: if delivery fails after payment,
+the system recovers the original order and result instead of charging again.
+The standalone source tree runs the copied Clink Core, Marketplace and Node
+flow with the necessary Monad adapter and watcher. The operator UI, API and
+merchant are local loopback services; the public review service remains
+simulated. No public product URL is claimed yet.
 
-Our first market hypothesis is agent builders who need to buy deterministic services such as reconciliation, enrichment, or analysis without handing the agent an unrestricted wallet. We will validate that hypothesis with an external developer quickstart, a small first-party merchant, and measured integration feedback. At this point we have no recorded external customers, revenue, partnerships, audit, or adoption claim.
+Our target users are Agent builders who buy deterministic APIs, reports or
+other metered services. We have no recorded customers, revenue, partnerships,
+audit or adoption claim. Multi-wallet public access, user revocation, recording and final submission
+are the remaining acceptance steps.”
 
-Monad testnet chain ID 10143 has been checked through read-only RPCs. The testnet token, executor, payee, public transaction, and public service URL remain pending user-approved deployment. Agentonomy is the team; contact is fengjie@alvinsclub.ai. The ask is simple: review the bounded authorization model, run the local quickstart, and tell us whether this is the payment boundary your agent service needs.”
-
-Keep the disclosure in the last paragraph if the recording is made before public acceptance. Do not say “live,” “audited,” “adopted,” or “official USDC” unless separate evidence has been added to the exact submitted commit.
+Keep the payment transaction and recovery evidence visible. Do not call the
+already-paid order's execute path again, and do not describe TestUSD as official
+USDC.
