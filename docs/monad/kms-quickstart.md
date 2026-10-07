@@ -44,8 +44,38 @@ example nonce and gas price with fresh, independently checked values:
 
 This command cannot sign or broadcast. A blocked balance/nonce/gas report is not
 deployment approval. The purchase signing worker deliberately cannot sign
-contract creation; deployment requires a separate, reviewed operator step for
-these exact two transactions. Do not loosen the purchase scope to deploy.
+contract creation. The separate `scripts.monad.deploy` operator handles only
+these exact two locally regenerated transactions; it does not change the
+purchase signing scope.
+
+Save the concrete plan in a private directory and record its `plan_sha256`.
+Validate the plan without loading AWS credentials:
+
+```sh
+.venv/bin/python -m scripts.monad.deploy \
+  --plan /absolute/private/plan.json \
+  --plan-sha256 EXACT_SHA256_FROM_PLAN \
+  --journal /absolute/private/deployment.json
+```
+
+For the already-reviewed plan, add `--execute` and
+`--signer-config /absolute/private/signer.json`. That file contains the
+`signer_configuration` object described below, including the independent role
+session references, not credential values. The operator verifies nonce, Gas,
+balances, constructor bytecode and both RPCs before signing. It saves the raw
+signed transaction privately before the first broadcast attempt.
+
+Repeat the same command and journal to reconcile the original hash. An attempted
+transaction is never automatically re-signed or re-broadcast. A pending result
+does not mean failure; do not delete the journal or create a replacement plan.
+The first CREATE must be Verified before the second is signed. Only `complete`
+means both creations have been independently verified. A later read-only run
+rechecks historical deployment evidence even after the buyer has spent tokens.
+
+The journal contains signed raw bytes and must stay private. Public output is
+limited to transaction hashes, contract addresses, code hashes and verification
+state. Store actual confirmed addresses and code hashes in the runtime manifest
+only after `complete`; predicted addresses alone are insufficient.
 
 After deployment, prepare a private `configuration.json` outside version control:
 

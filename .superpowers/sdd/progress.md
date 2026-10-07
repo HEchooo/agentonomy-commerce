@@ -35,3 +35,16 @@ No public testnet deployment/transaction claimed.
 - Public wallet/signers, network deployment, license choice, canary and final submission remain pending user cooperation.
 - GitNexus staged change detection: 72 files, 5 affected execution flows, MEDIUM. Git diff confirms source changes scoped to new rail/composition and policy network migration.
 - Implementation commit `87f7538` was fast-forwarded into the original Commerce main checkout. Merged-location smoke passed: 71 Monad tests and 21 Core budget tests. Original untracked plan and verification/review logs are preserved under `.artifacts/monad-implementation/`. No remote push.
+
+## 2026-10-07 continuation
+Base 2d34833, branch codex/monad-role-acceptance; isolated worktree /private/tmp/agentonomy-commerce-role-20261007-code.
+User authorizes dedicated test role and Monad public acceptance, superseding earlier no-broadcast planning constraint. Clink DEV/PROD changes remain prohibited.
+- Live independent role session verified, two test-key DryRun passes; response + three PROD key DryRuns denied. No actual signatures/broadcasts yet.
+- Signer identity/session guards: completed and committed as 49e60b8.
+- Bounded deployment CLI: implemented with purchase scope unchanged; final recovery re-review APPROVE (specification and quality), targeted7 passed.
+- Relayer 0 MON on two RPCs; buyer 40 MON. Requested 2 test MON funding; wallet signatures later required.
+- Role integration: task review APPROVE, spec + quality after FIFO nonblocking fix. Focused100 passed; expanded pre-FIFO136 passed; live isolated worker health/DryRun ready (no actual signatures). Reports /private/tmp/commerce-role-{task-report,review}.md.
+- Existing Commerce16 / Review76 / submission6 passed; compiled Solidity forge test exited0.
+- Deployment review fixes implemented and approved: strict complete-journal cardinality and summary schema; private lock/file validation; receipt/transaction lag and RPC recovery; fresh first-CREATE recheck before second-CREATE progress; historical mint balance proof after later purchases; immediate pending on ambiguous broadcast; durable original transaction evidence after storage failures. Latest full Monad suite270 passed, Core budget/recovery/migration21 passed. Brief /private/tmp/commerce-deployment-task-brief.md; review /private/tmp/commerce-final-review.md.
+- Public utility must not hardcode private AWS account/key identifiers; reviewed private signer config pins exact user-supplied role and keys, worker validates STS against that exact role. Private live config prepared in /private/tmp/agentonomy-commerce-deployment-20261007 (no credentials); actual credentials remain only in separate protected role session directory.
+- Final staged GitNexus check: seven files, 141 symbols, eight execution flows, HIGH. All affected flows start in the new bounded deployment operator; reviewed risk and no Clink modifications. Diff whitespace check passed; changed tracked files contain no actual private AWS account/key identifiers or private-key PEM blocks. Public deployment remains blocked on relayer funding.
