@@ -3,8 +3,10 @@
 This is an operator-run **Monad testnet** path. The public wallet supplies its
 own signatures; the application never receives its private key. Public chain
 acceptance remains pending: a passing local test is not a Monad transaction.
-The existing review website is a separate deployment and is not upgraded by
-starting this command.
+Both contracts were deployed and independently verified on October 7; see the
+[live deployment evidence](role-session-acceptance.md). Owner wallet setup and
+purchase acceptance remain pending. The existing review website is a separate
+deployment and is not upgraded by starting this command.
 
 ## Scope and prerequisites
 
