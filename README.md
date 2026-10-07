@@ -17,8 +17,7 @@ Start with [the quickstart](docs/monad/quickstart.md),
 [public deployment prerequisites](docs/monad/deployment.md).
 The [external OKX wallet and dedicated KMS operator path](docs/monad/kms-quickstart.md)
 adds bounded signing, wallet setup, and recovery of the original paid order.
-Public Monad deployment and wallet acceptance remain pending; the existing review
-service below continues to use explicitly simulated settlement.
+The Monad contracts are deployed and verified through both RPCs, and OKX authorization is complete. A real 0.30 TestUSD payment was initiated on chain 10143; the API order is `delivered`, and the CSV report was delivered once. Same-order recovery/query returned the identical report without a second payment. The receipt is verified through both RPCs, with 0.70 TestUSD remaining. See [role-session acceptance](docs/monad/role-session-acceptance.md) and [recording checklist](docs/monad/recording-checklist.md) for transaction and recovery evidence. Core/onchain revocation, recording, and final submission remain pending. The public review service remains explicitly simulated.
 
 ## Run locally
 
