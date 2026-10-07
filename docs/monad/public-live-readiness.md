@@ -1,133 +1,94 @@
-# Public Monad product readiness — wallet and OPC proposal
+# Own-wallet public Monad product readiness
 
-Status on 2026-10-07: design preparation, not a public deployment. The user has
-chosen **reviewers use their own wallets**. The user then asked to discuss the
-website/OPC binding and temporary-token flow. No wallet-authentication or
-signer-scope change is implemented by this document.
+Status on 2026-10-08 (Asia/Shanghai): the new hosted composition is implemented
+and its relevant local regressions passed. It is **not yet deployed or accepted on the
+public HTTPS endpoint**. `review.agentonomy.xyz` still serves the earlier
+simulated review product. The previously accepted real single-wallet order and
+contracts remain unchanged; see [role-session acceptance](role-session-acceptance.md).
 
-## Confirmed current boundary
+## Implemented flow
 
-- Actual Monad testnet contracts and one paid/delivered order are recorded in
-  [role-session-acceptance.md](role-session-acceptance.md).
-- `examples/monad_commerce/public_api.py` is a fixed-owner loopback operator
-  adapter. Its random session cookie is not wallet authentication. It cannot
-  be made a multi-wallet public product by adding only a reverse proxy.
-- `PublicCanary` / `PublicCoreBridge` / `ExternalWalletCore` reuse the copied
-  Core, Marketplace and Node business services. The signer is pinned to one
-  configured owner and nonce scope; each current state directory belongs to
-  that owner.
-- `review.agentonomy.xyz` remains the simulated public review deployment.
-  It is not the required live Monad product endpoint.
-- Read-only GCP inventory confirms the previously authorized independent
-  `agentonomy-commerce-review-01` is RUNNING, e2-medium, at 34.21.234.127 in
-  asia-southeast1-b, project blockchain-nodeservice. This is an inventory check,
-  not proof of installed live runtime, HTTPS routes or available OS access.
+1. Connect an EOA browser wallet on Monad testnet 10143. Sign a fresh wallet
+   challenge bound to the HTTPS domain and the browser/CSRF session.
+2. Claim 1.00 valueless TestUSD from the new fixed-supply claim contract.
+   Users supply test MON for their own claim, approve and revoke transactions.
+3. Authorize the existing Core business grant, sign its EIP-712 chain budget,
+   and approve exactly 1.00 TestUSD. The grant lasts one day, has a 1.00 total
+   limit and a 0.50 per-payment limit. Login never renews or resets it.
+4. Sign installation consent for this wallet's hosted demonstration Agent.
+   Canonical OPC exchanges a short-lived credential inside the hosted process;
+   the user does not copy a token. Each MCP admission and callback rechecks Core.
+5. Discover and preview the CSV reconciliation service through the shipped
+   Node and actual MCP SDK, then purchase for 0.30 TestUSD. Core retains identity,
+   policy, reservation, funding and audit authority. Marketplace retains order
+   idempotency, verified payment and paid-delivery recovery.
+6. Query/recover the same order, or revoke Core and chain authorization with
+   distinct states. A delivery failure does not authorize another payment.
 
-## Identity model to reuse
+This release implements the website-hosted Agent flow. An externally installed
+Agent's publicly reachable pairing/MCP endpoint is not part of this rollout.
 
-The copied Core already has account browser sessions and OPC installation
-pairing. These are two forms of access to the same Core authority, not two
-payment engines:
+## Isolation and recovery
 
-| Identity | Existing implementation | Intended public role |
-| --- | --- | --- |
-| User wallet | AccountService wallet challenge/verification | Prove wallet control on the website |
-| Browser | Account browser session and CSRF cookie checks | View own identity, limits, allowance and orders |
-| OPC installation | OpcAccountService pairing plus wallet-authorized installation clause | Bind a particular Agent/device to an active spending grant |
-| Agent credential | OpcAccountService.issue_token / authenticate_access_token | Short-lived capability for the bound installation |
-| Signing service | Dedicated KMS signer worker | Authorize only a Core-approved purchase, with no AWS credential export |
+- Wallet proof determines the server-owned opaque tenant; clients cannot select
+  a user, tenant, Agent or merchant. Each wallet has separate Core/Marketplace
+  state and its own hosted installation.
+- Browser credentials are Secure HttpOnly cookies. State stores browser/CSRF
+  digests; no AWS credential or Agent token appears in a browser response.
+- One durable relayer gate spans all wallets. Unknown transaction outcomes
+  retain their original order across restarts. Only canonical Core evidence
+  verified by both RPCs can release a submitted payment's lane.
+- Re-login preserves the original identity, grant, counters, allowance and
+  orders. An unsigned grant challenge may move to a newly verified browser;
+  signed or expired authorization is never silently reconstructed.
+- The browser preserves only the current wallet's original preview, purchase
+  and idempotency references. It restores them only after fresh server
+  authentication; a refresh or timed-out response never automatically executes,
+  signs or broadcasts a replacement payment.
+- Linux uses `agentonomy-web` and `agentonomy-sign`. The root-installed launcher
+  accepts only a canonical owner change from its pinned configuration. Keys,
+  role, network, credential path, nonce window and gas limits remain exact.
+  The release and virtual environment must be root-owned and immutable to both
+  service accounts. Local process isolation alone is not an OS security boundary.
 
-The OPC device uses an **ES256 JWT proof** to obtain a short-lived bearer.
-The user wallet separately signs the installation consent with **EIP-191**.
-This is not Hosted Facilitator DPoP. The existing OPC token TTL is
-**300 seconds**, bounded further by installation
-consent and grant expiry. A pairing expires after **10 minutes**. These are
-source facts in `apps/core/services/account_service/opc_service.py`; they are
-not a claim that the current Monad operator app already exposes OPC.
+## Bounded review deployment
 
-The copied OPC code currently binds `agent_id=hermes` and payments scope. The
-Monad acceptance composition has its own fixed Agent/owner configuration.
-Their identity and grant relationship must be deliberately integrated and
-tested. Do not replace this binding with an arbitrary browser-supplied user ID
-or hand a generic bearer token to an unverified visitor.
+The application admits at most 128 active browser sessions, 32 persistent wallet
+namespaces and four open wallet runtimes. This is a supervised hackathon trial,
+not an unlimited multiuser production service. The claim pool contains exactly
+1000 TestUSD, with one 1.00 claim per address and no mint/admin/upgrade capability.
+The application admission limit is separate from the contract's claim pool.
 
-## Proposed user flow
+The concrete deployment proposal is in
+[public deployment plan](public-deployment-plan-20261008.md). Its public relayer
+nonce window permits nine purchase transactions; extending that window requires
+a separately reviewed scope update. Failed or exhausted authorization does not
+create a replacement grant or wallet budget.
 
-1. Open the project's actual HTTPS commerce page and connect a compatible EOA
-   wallet on Monad testnet 10143.
-2. Sign a fresh, domain-bound wallet-login challenge. The server resolves the
-   verified account and establishes an HttpOnly Secure browser session. Merely
-   returning an address from `eth_requestAccounts` is not login proof.
-3. Inspect and authorize the service scope, token, merchant, total limit,
-   per-payment limit and expiry. Keep business Mandate and EIP-712 onchain grant
-   distinct, with a finite ERC-20 approve. Never request a wallet private key.
-4. For an external Agent, open the OPC installation's one-time binding link and
-   authorize that named installation against the same wallet and Mandate. The
-   Agent obtains/refreshes its short-lived credential through the existing
-   installation proof mechanism; the user does not copy a backend token.
-5. Search, quote and buy through the existing unified `clink_node` MCP.
-   Marketplace/Core/contract/watcher perform the same verified payment and
-   delivery flow. Each account sees only its own grants, orders and results.
-6. Re-query/recover the paid order without another debit. Revoke Agent consent,
-   Core Mandate and the chain grant with their separate states shown clearly.
+## Remaining live gates
 
-For a browser-only hackathon experience, a hosted Agent can perform the
-MCP call after the website has bound its installation to the verified user.
-The reviewer should not need to install an Agent or copy a temporary token.
-That hosted Agent admission and consent must be real OPC/Core authorization;
-it is not permission to reuse the fixed demo installation across wallets.
-An external Agent can use the separate pairing flow above. This is a proposed
-product choice, not yet implemented or accepted on the public endpoint.
+Local verification: 479 Monad tests, 21 Core budget/recovery/migration tests,
+64 contract tests, 25 Commerce tests, 76 Review tests, six submission tests,
+15 canonical OPC tests and ten Node MCP gateway tests passed. These include
+isolated two-owner composition and failure/recovery fixtures; they do not
+replace two-wallet acceptance on the actual HTTPS/Linux host.
 
+- GCP currently refuses OS Login for the existing operator account because the
+  target organization requires `roles/compute.osLoginExternalUser`. No account
+  switch, SSH key addition, instance metadata workaround or server change was
+  performed. Administrator access is required before the protected rollout.
+- Review the concrete two-CREATE plan and public relayer scope. Recheck the
+  pending nonce, gas price, balance, role, key pins and both RPCs before execution.
+- Install the protected role session through SSH/stdin using the standalone
+  guarded installer. Verify the two OS identities and fixed launcher on the
+  actual host, not merely from local source inspection.
+- Verify both new contract receipts and code hashes, produce the deployment
+  manifest, then point HTTPS to the new loopback service with fresh protected
+  state. A prepared configuration with missing code hashes must remain blocked.
+- Complete live own-wallet login, claim, consent, approve, purchase, delivery,
+  same-order recovery and revoke/refusal. Verify a second wallet cannot access
+  the first wallet's orders or budget. Only then update public evidence, the
+  saved submission form and final recording materials.
 
-The website is the user control surface. Browser-session, Agent-access and AWS
-STS credentials have different recipients and expiry rules; none substitutes
-for a valid wallet spending signature or chain allowance.
-
-## Implementation gates before exposing the service
-
-- Integrate the copied Core account/OPC routes with the Monad composition,
-  including exact account-to-owner and installation-to-grant binding. Keep
-  production chain allowlists and Clink DEV/PROD untouched.
-- Persist separate account budget/order state, authorize every read and write
-  by the server-resolved account, and test cross-wallet access refusal. Reload
-  or expiry must not reset a budget or silently replace a grant.
-- Serialize the shared relayer nonce path across accounts. An unknown broadcast
-  must retain its original hash and block unsafe replacement, including after
-  restart. Existing fixed-owner nonce scope must not be casually widened.
-- Resolve TestUSD availability for a new wallet and separate test MON gas
-  acquisition. The deployed `AgentonomyTestUSD` has only **1.00 TestUSD fixed
-  total supply**, initially assigned to the accepted buyer. It has transfer,
-  approve and transferFrom, but **no mint/faucet**. A new wallet cannot buy
-  simply by logging in. The `mint` in local mocks is not deployed. Choose a
-  bounded test-token distribution/recycling design or a separately reviewed
-  test faucet deployment before advertising self-service funding; do not
-  silently replace accepted token/executor addresses or widen signer scope.
-- Serve the public origin over TLS; keep Core, Marketplace, merchant and signer
-  private. Use exact Origin/Host checks, CSRF, session expiry, body limits and
-  bounded admission. Do not proxy the existing anonymous operator session.
-- Run signing under an independent protected identity. Install only the approved
-  role's short-lived session through the protected installer and SSH/stdin;
-  never copy operator long-term access keys or give AWS credentials to Node,
-  Core, Marketplace, Watcher or browsers.
-- Verify two real wallets have independent identity/grants/orders; prove one
-  actual testnet purchase/delivery/recovery and revoke/refusal. Then publish the
-  actual HTTPS URL and update the saved form, before recording final footage.
-
-## Existing files to reuse / anticipated adaptation
-
-- `apps/core/services/account_service/{app,service,repository,opc_service}.py`:
-  browser login, consent and installation/token authority.
-- `apps/node/clink_node/opc_{client,core_client,onboarding,setup}.py` and shared
-  OPC protocol: installation proof and unified Agent access.
-- `examples/monad_commerce/{public_api,public_canary,public_core,public_bridge,
-  public_worker,public_market_worker,public_node}.py`: verified Monad composition
-  currently used for single-wallet acceptance.
-- `agentonomy_commerce/{budget_backend,budget_network,signer_process}.py`:
-  payment rail, independent observations and isolated signing.
-
-This is a reuse map and acceptance boundary, not permission to edit all these
-modules. Freeze the concrete interfaces and run symbol impact analysis before
-assigning disjoint implementation tasks. Add failing behavioral tests for
-wallet/session replay, cross-account access and relayer concurrency before
-changing runtime code.
+No Clink DEV/PROD service, IAM policy, Key Policy, mainnet authorization or
+production payment switch is part of this change.

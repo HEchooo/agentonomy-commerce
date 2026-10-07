@@ -68,3 +68,48 @@ This entry supersedes earlier wallet/payment-pending statements, which remain hi
 - Remaining: chosen public access mode and deployment; owner onchain revocation/refusal while balance remains; recording; license/rule review; final user review. Do not revoke current grant or pay another order just for material cleanup.
 
 - Later user steering: reviewers must use their own wallets. Website wallet login → bounded consent → OPC installation/short-lived credential flow is being discussed. Root confirmed the copied OPC service uses 300-second access credentials and 10-minute pairing; the current Monad fixed-owner adapter is not yet that public OPC flow. See docs/monad/public-live-readiness.md.
+
+## 2026-10-08 own-wallet hosted composition
+
+This entry supersedes the earlier discussion-only status of public OPC composition.
+Plan: docs/superpowers/plans/2026-10-08-public-wallet-commerce.md.
+- Implemented fresh HTTPS wallet proof, finite business/chain grants, fixed-supply
+  TestUSD claim, per-owner canonical OPC installation consent and short credential
+  exchange inside the hosted Agent. The browser receives no Agent bearer token.
+- Actual MCP SDK calls the copied Node/Core/Marketplace implementation. Per-wallet
+  state remains isolated, while all wallets share one durable relayer gate.
+  Unknown outcomes keep the original order. Re-login/expiry/revocation do not reset
+  grants, counters or orders. Frontend retains only nonsecret original order
+  references and never automatically executes after refresh.
+- Added a protected Linux signer launcher, separate web/sign OS users, a root
+  release/service boundary and a standalone temporary-session installer. Exact AWS
+  identity/key pins live in private configuration, not source or browser state.
+- Independent reviews addressed exact OPC principal schema, authority freshness,
+  domain binding, finality head agreement, active-call shutdown and cross-owner
+  behavior. The actual Linux privilege boundary remains a live deployment gate.
+- Relevant local regression: Monad479, Core budget/recovery/migration21,
+  contracts64 (including 128,000 invariant calls), Commerce25, Review76,
+  submission6, canonical OPC15 and Node MCP10 passed. Final focused frontend,
+  hosted security and server27 passed. Deprecation/lint warnings do not affect
+  these successful results.
+- Fresh local isolated-role identity/key/DryRun checks passed; no actual new
+  signature or transaction was generated. Concrete unsigned two-CREATE proposal
+  and bounded nine-purchase scope are in docs/monad/public-deployment-plan-20261008.md.
+- GCP OS Login is currently blocked for the existing operator account; an
+  administrator must restore access. No account switch, IAM/Key Policy change,
+  successful SSH key addition, instance metadata workaround or remote rollout
+  was performed. The previous real delivered order is preserved. HTTPS deployment,
+  new contracts, live two-wallet acceptance, revocation/refusal and videos are
+  still pending; do not claim the public product is complete.
+- Final independent UI review found no blocker after generation/owner guards and
+  serial session/logout cookie writes. Real backend revocation semantics are
+  retained: old cookies cannot restore a revoked Core browser session.11 UI
+  tests passed, covering late order/signature/session responses and fresh-owner
+  reconnection. Source scope/secret-pattern scan checked893 files with no finding.
+- Final GitNexus staged detection:43 files,987 symbols,31 affected flows,
+  CRITICAL aggregate risk. Root reported this before committing and checked the
+  actual Git diff: only the expected new hosted/deployment/faucet/gate/test files
+  and three existing documentation files changed. The CLI also reports shared
+  README heading/symbol names in unmodified files; its name mapping is not a
+  substitute for the reviewed file diff. No canonical copied Core/Node/Marketplace
+  business source or Clink checkout was modified. No live risk gate is waived.

@@ -1,0 +1,11 @@
+#!/bin/sh
+set -eu
+
+cd /opt/agentonomy-commerce/current
+exec /usr/bin/env -i \
+  PATH=/usr/bin:/bin \
+  LANG=C \
+  LC_ALL=C \
+  PYTHONUNBUFFERED=1 \
+  /opt/agentonomy-commerce/current/.venv/bin/python \
+  -I /opt/agentonomy-commerce/current/examples/monad_commerce/hosted_signer.py

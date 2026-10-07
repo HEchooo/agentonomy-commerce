@@ -1,0 +1,22 @@
+[Unit]
+Description=Agentonomy Commerce hosted Monad review service
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=agentonomy-web
+Group=agentonomy-web
+# hosted_server binds the process to 127.0.0.1:8092; the proxy owns public TLS.
+WorkingDirectory=/opt/agentonomy-commerce/current
+ExecStart=/opt/agentonomy-commerce/current/.venv/bin/python -m examples.monad_commerce.hosted_server --config /var/lib/agentonomy-web/configuration.json --state-dir /var/lib/agentonomy-web/state --origin https://review.agentonomy.xyz --port 8092
+Restart=on-failure
+RestartSec=5
+UMask=0077
+ProtectHome=true
+ProtectSystem=strict
+PrivateTmp=true
+ReadWritePaths=/var/lib/agentonomy-web
+
+[Install]
+WantedBy=multi-user.target

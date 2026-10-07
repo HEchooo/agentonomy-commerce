@@ -1,0 +1,3 @@
+# The web process may invoke only the fixed, root-installed signer launcher.
+Defaults:agentonomy-web env_reset
+agentonomy-web ALL=(agentonomy-sign) NOPASSWD: /usr/local/libexec/agentonomy-monad-sign ""

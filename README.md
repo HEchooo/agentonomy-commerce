@@ -19,6 +19,19 @@ The [external OKX wallet and dedicated KMS operator path](docs/monad/kms-quickst
 adds bounded signing, wallet setup, and recovery of the original paid order.
 The Monad contracts are deployed and verified through both RPCs, and OKX authorization is complete. A real 0.30 TestUSD payment was initiated on chain 10143; the API order is `delivered`, and the CSV report was delivered once. Same-order recovery/query returned the identical report without a second payment. The receipt is verified through both RPCs, with 0.70 TestUSD remaining. See [role-session acceptance](docs/monad/role-session-acceptance.md) and [recording checklist](docs/monad/recording-checklist.md) for transaction and recovery evidence. Core/onchain revocation, recording, and final submission remain pending. The public review service remains explicitly simulated.
 
+The new own-wallet website implementation is in
+`examples/monad_commerce/hosted_*`. It adds browser wallet proof, isolated
+account state, a fixed-supply TestUSD claim, finite spending consent, and
+wallet-approved Agent installation. The hosted Agent exchanges short-lived
+credentials internally and calls the shipped Node through the actual MCP SDK;
+the browser never receives an Agent bearer token. All wallets share one durable
+relayer gate. Linux signing runs through a separate service user and a fixed
+launcher whose key, network, nonce and gas scope cannot be selected by a visitor.
+See [public implementation readiness](docs/monad/public-live-readiness.md) and
+[hosted operations](docs/monad/hosted-operations.md). This new implementation is
+locally tested; new contracts, HTTPS rollout and two-wallet live acceptance are
+still pending. The previous deployed contracts and order above are unchanged.
+
 ## Run locally
 
 Use Python 3.12 for the reproducible environment below.
