@@ -16,9 +16,10 @@ starting this command.
   **0.50 TestUSD**; CSV service price: **0.30 TestUSD**; signed grant: one day.
 - Buyer needs test MON for approval and revocation; relayer needs test MON for
   deployment and payment execution. The execution-signing address needs no gas.
-- An administrator must apply the narrow, exact-two-key permission described in
-  [the administrator handoff](kms-administrator-handoff.md). A local approval
-  cannot substitute for AWS permission. Existing PROD keys remain separate.
+- Use the approved runtime role through an independent temporary session and
+  exact-two-key session policy described in [the administrator handoff](kms-administrator-handoff.md).
+  Do not configure the runtime with the operator profile. Existing PROD keys
+  remain separate; sharing the new test keys with DEV does not share its session.
 
 ## Verify and prepare
 
@@ -52,8 +53,13 @@ After deployment, prepare a private `configuration.json` outside version control
    `executor`, `payee`, `token_decimals`, `gas_limit`, `max_gas_price_wei`, `owner`,
    `execution_signer`, `relayer`, `domain`, `token_code_hash`, `executor_code_hash`.
    Use the actual deployed addresses/code hashes, not predicted values alone.
-2. `signer_configuration`: named AWS `profile`, `region` (`ap-southeast-1`),
-   `account_id`, exact `execution_key_arn` and `gas_key_arn`, plus `scope`.
+2. `signer_configuration`: named temporary AWS `profile`, `region`
+   (`ap-southeast-1`), `account_id`, exact `expected_role_arn`, absolute
+   `credential_directory`, exact `execution_key_arn` and `gas_key_arn`, plus `scope`.
+   The credential directory is private (`0700`), with only the selected temporary
+   profile in its `credentials` file and a region-only `config` (both `0600`).
+   The worker rejects IAM users, a different role, provider fallback and role
+   chaining. Startup checks identity before key metadata, public keys and DryRun.
 3. `scope`: `network` (the same network fields as deployment, excluding wallet,
    domain and code-hash fields), `owner`, `execution_address`, `relayer_address`,
    `nonce_min`, `nonce_max`. After exactly two initial CREATEs from nonce 0,
@@ -63,6 +69,11 @@ No access key, secret, session token, wallet key or seed belongs in this JSON.
 Configuration must match the signed budget and deployed contracts exactly.
 Startup independently checks both RPCs, token identity, executor chain/token,
 canonical Verified boundary and actual runtime code hashes.
+
+The role session expires independently of the onchain budget. Record its expiry
+privately and renew before recording when necessary. Never put credential values
+into the application environment, Node, Marketplace, Core or Watcher. Local
+process separation is not an OS security boundary against the same user.
 
 ## Run the operator page
 
