@@ -81,3 +81,40 @@ def test_corrected_hash_is_pending_not_previous_rejected_status(canary, monkeypa
     assert canary.wallet_operations['approval']['status'] == 'pending'
     assert canary.wallet_operations['approval']['transaction_hash'] == correct
     assert canary.wallet_operations['approval']['rejected_transaction_hash'] == wrong
+
+
+def test_public_marketplace_uses_longer_worker_timeout(monkeypatch, tmp_path):
+    created = []
+
+    class FakeCore:
+        def close(self):
+            self.closed = True
+
+    class FakeMarketplace:
+        def __init__(self, *args, **kwargs):
+            created.append((args, kwargs))
+
+        def request(self, method, arguments=None):
+            assert method == 'initialize'
+            assert arguments == {}
+            return {'status': 'ready'}
+
+        def close(self):
+            pass
+
+    monkeypatch.setattr(public_canary, 'MarketplaceBridge', FakeMarketplace)
+    instance = public_canary.PublicCanary.__new__(public_canary.PublicCanary)
+    instance.state_dir = tmp_path
+    instance.bootstrap = {}
+    instance.core = FakeCore()
+    instance.market = None
+    instance._onboarding_status = lambda: {
+        'wallet_identity_id': 'wallet',
+        'spending_grant_id': 'grant',
+        'budget_binding_id': 'binding',
+        'allowance_id': 'allowance',
+    }
+
+    instance._start_market()
+
+    assert created[0][1]['timeout_seconds'] == 240

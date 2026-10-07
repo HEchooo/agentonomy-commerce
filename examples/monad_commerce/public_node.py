@@ -19,7 +19,7 @@ class ApiCanaryClient:
             or parsed.username or parsed.password or parsed.path or parsed.query or parsed.fragment):
             raise ValueError('explicit loopback operator API required')
         self.client = httpx.Client(base_url=origin, headers={'Origin': origin},
-            timeout=45, trust_env=False, follow_redirects=False, transport=transport)
+            timeout=270, trust_env=False, follow_redirects=False, transport=transport)
 
     def __enter__(self):
         self.client.post('/api/session', json={}).raise_for_status()

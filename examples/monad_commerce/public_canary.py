@@ -98,7 +98,11 @@ class PublicCanary:
             raise ValueError('wallet setup must be completed first')
         self.core.close()
         self.core = None
-        self.market = MarketplaceBridge(self.state_dir, worker_module='examples.monad_commerce.public_market_worker')
+        self.market = MarketplaceBridge(
+            self.state_dir,
+            worker_module='examples.monad_commerce.public_market_worker',
+            timeout_seconds=240,
+        )
         try:
             self.market.request('initialize', self.bootstrap)
         except BaseException:

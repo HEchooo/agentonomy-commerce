@@ -8,6 +8,8 @@ from examples.monad_commerce.core_bridge import CoreBridge, ROOT
 
 
 class PublicCoreBridge(CoreBridge):
+    timeout_seconds = 180
+
     def _start(self):
         if self._broken is not None:
             raise RuntimeError('Core channel unavailable; inspect original order')

@@ -24,3 +24,24 @@ def test_node_cannot_choose_external_api_or_signing_method():
     for url in ['https://example.com', 'http://127.0.0.1:8091/path', 'http://x:y@127.0.0.1:8091']:
         with pytest.raises(ValueError): ApiCanaryClient(url)
     with pytest.raises(ValueError): ApiCanaryClient().request('sign_digest', {'digest':'x'})
+
+
+def test_node_http_timeout_is_270_and_passed_to_requests():
+    seen_timeouts = []
+
+    def handle(request):
+        seen_timeouts.append(request.extensions.get('timeout'))
+        if request.url.path == '/api/session':
+            return httpx.Response(
+                200,
+                json={'status': 'ready'},
+                headers={'set-cookie': 'agentonomy_monad_operator=test; HttpOnly; Path=/api'},
+            )
+        return httpx.Response(200, json={'commerce': {'state': 'ready'}})
+
+    with ApiCanaryClient(transport=httpx.MockTransport(handle)) as client:
+        assert client.client.timeout.read == 270
+        client.request('snapshot')
+
+    assert seen_timeouts
+    assert all(timeout['read'] == 270 for timeout in seen_timeouts)

@@ -18,6 +18,8 @@ WORKER = ROOT / "examples" / "monad_commerce" / "core_worker.py"
 class CoreBridge:
     """Expose the Core service composition without importing Core in Marketplace."""
 
+    timeout_seconds = 45
+
     def __init__(self, state_dir: Path, bootstrap: dict):
         self.bootstrap = bootstrap
         persistent = True
@@ -98,7 +100,7 @@ class CoreBridge:
             with selectors.DefaultSelector() as selector:
                 try:
                     selector.register(self.process.stdout, selectors.EVENT_READ)
-                    ready = selector.select(timeout=45)
+                    ready = selector.select(timeout=self.timeout_seconds)
                 except (OSError, ValueError) as exc:
                     message = "local Core worker channel is unavailable"
                     self._mark_broken(message)

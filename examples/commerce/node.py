@@ -7,6 +7,7 @@ from __future__ import annotations
 
 import asyncio
 import json
+import math
 import os
 from pathlib import Path
 import selectors
@@ -32,6 +33,8 @@ def object_schema(properties, required=()):
 
 
 IDENTIFIER = {'type': 'string', 'minLength': 1, 'maxLength': 160}
+DEFAULT_MARKETPLACE_TIMEOUT_SECONDS = 45
+MAX_MARKETPLACE_TIMEOUT_SECONDS = 900
 TOOL_SCHEMAS = {
     'search_clink_services': object_schema({'query': {'type': 'string', 'maxLength': 200}}),
     'get_clink_service_details': object_schema({'offering_id': IDENTIFIER}, ['offering_id']),
@@ -59,7 +62,18 @@ METHODS = {
 
 
 class MarketplaceBridge:
-    def __init__(self, state_dir: Path, *, worker_module="examples.commerce.market_worker", worker_args=()):
+    def __init__(self, state_dir: Path, *, worker_module="examples.commerce.market_worker",
+                 worker_args=(), timeout_seconds=DEFAULT_MARKETPLACE_TIMEOUT_SECONDS):
+        if isinstance(timeout_seconds, bool) or not isinstance(timeout_seconds, (int, float)):
+            raise ValueError('timeout_seconds must be a finite positive number')
+        try:
+            timeout_seconds = float(timeout_seconds)
+        except (OverflowError, ValueError):
+            raise ValueError('timeout_seconds must be a finite positive number') from None
+        if (not math.isfinite(timeout_seconds) or timeout_seconds <= 0
+                or timeout_seconds > MAX_MARKETPLACE_TIMEOUT_SECONDS):
+            raise ValueError('timeout_seconds must be a finite positive number at most 900')
+        self.timeout_seconds = timeout_seconds
         env = {key: value for key, value in os.environ.items()
                if key in {'PATH', 'SYSTEMROOT', 'TMPDIR', 'LANG', 'LC_ALL'}}
         env['PYTHONPATH'] = str(ROOT)
@@ -99,7 +113,7 @@ class MarketplaceBridge:
             return response['result']
 
     def _read_response(self):
-        deadline = time.monotonic() + 45
+        deadline = time.monotonic() + self.timeout_seconds
         with selectors.DefaultSelector() as selector:
             selector.register(self.process.stdout, selectors.EVENT_READ)
             while b'\n' not in self.buffer:
