@@ -3,6 +3,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 import re
+import time
 from urllib.parse import urlsplit
 
 import httpx
@@ -13,6 +14,10 @@ READ_METHODS = frozenset({
     "eth_getBalance", "eth_call", "eth_estimateGas", "eth_gasPrice",
     "eth_getTransactionCount", "eth_maxPriorityFeePerGas", "web3_clientVersion",
 })
+
+
+class _OversizedResponse(ValueError):
+    """Keep an oversized response fail-fast instead of retrying its payload."""
 
 
 def address(value: str) -> str:
@@ -96,18 +101,29 @@ class RpcClient:
     def call(self, method: str, params: list):
         if method not in READ_METHODS and not (self.writable and method == "eth_sendRawTransaction"):
             raise ValueError("RPC method is outside this client's scope")
-        try:
-            with httpx.Client(timeout=15, trust_env=False, follow_redirects=False) as client:
-                response = client.post(self.url, json={"jsonrpc": "2.0", "id": 1, "method": method, "params": params})
-                response.raise_for_status()
-                if len(response.content) > 2_000_000:
-                    raise ValueError("RPC response too large")
-                data = response.json()
-        except (httpx.HTTPError, ValueError) as exc:
-            raise RuntimeError("RPC request failed; status may be unknown") from None
-        if not isinstance(data, dict) or data.get("id") != 1 or "error" in data or "result" not in data:
-            raise RuntimeError("RPC returned invalid or failed response")
-        return data["result"]
+        max_attempts = 3 if method in READ_METHODS else 1
+        retry_delays = (0.1, 0.2)
+        for attempt in range(max_attempts):
+            try:
+                with httpx.Client(timeout=15, trust_env=False, follow_redirects=False) as client:
+                    response = client.post(self.url, json={"jsonrpc": "2.0", "id": 1, "method": method, "params": params})
+                    response.raise_for_status()
+                    if len(response.content) > 2_000_000:
+                        raise _OversizedResponse("RPC response too large")
+                    data = response.json()
+            except _OversizedResponse:
+                raise RuntimeError("RPC request failed; status may be unknown") from None
+            except (httpx.HTTPError, ValueError):
+                if attempt + 1 < max_attempts:
+                    time.sleep(retry_delays[attempt])
+                    continue
+                raise RuntimeError("RPC request failed; status may be unknown") from None
+            if not isinstance(data, dict) or data.get("id") != 1 or "error" in data or "result" not in data:
+                if attempt + 1 < max_attempts:
+                    time.sleep(retry_delays[attempt])
+                    continue
+                raise RuntimeError("RPC returned invalid or failed response")
+            return data["result"]
 
     def check_chain(self, chain_id: int):
         if quantity(self.call("eth_chainId", [])) != chain_id:
