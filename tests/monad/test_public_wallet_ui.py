@@ -149,6 +149,7 @@ async function main() {
 
   await ui.approveAllowance();
   const afterPending = ui.state();
+  const allowanceLink = nodes['tx-links'].children[0] && nodes['tx-links'].children[0].href;
   await ui.verifyAllowance();
   const afterVerify = ui.state();
   providerListeners.accountsChanged(['0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa']);
@@ -159,7 +160,7 @@ async function main() {
   await ui.verifyAllowance();
 
   process.stdout.write(JSON.stringify({
-    beforeConnect, wrongWallet, wrongChain, rejected, afterPending, afterVerify, afterAccountChange,
+    beforeConnect, wrongWallet, wrongChain, rejected, afterPending, allowanceLink, afterVerify, afterAccountChange,
     sessionCount, walletVerifyCount, allowanceSendCount, allowanceVerificationCount, allowanceRecoveryEnabled,
     loadProviderMethods,
     typedGood: ui.validateTypedData(typedGood, {owner: OWNER, chain_id: 10143, executor: EXECUTOR, token: TOKEN, payee: PAYEE, execution_signer: OWNER}),
@@ -187,6 +188,7 @@ main().catch(error => { console.error(error); process.exit(1); });
     assert result["allowanceBad"] is False
     assert result["afterPending"]["allowance_tx_hash"]
     assert result["afterPending"]["allowance_verification_pending"] is True
+    assert result["allowanceLink"].endswith("aa" * 32)
     assert result["afterVerify"]["allowance_verified"] is True
     assert result["allowanceSendCount"] == 1
     assert result["allowanceVerificationCount"] == 3
@@ -316,6 +318,17 @@ const APPROVAL_HASH = '0x' + 'aa'.repeat(32);
 const REVOKE_HASH = '0x' + 'bb'.repeat(32);
 const PAYMENT_HASH = '0x' + 'cc'.repeat(32);
 const GRANT_ID = '0x' + 'dd'.repeat(32);
+const verifiedSettlement = {transaction_hash: PAYMENT_HASH, status: 'verified', verified: true,
+  chain_id: 10143, receipt_status: 1, two_rpc_verified: true, amount_atomic: '300000', token: TOKEN};
+let settlementVariant = 'valid';
+function settlement() {
+  if (settlementVariant === 'unverified') return {...verifiedSettlement, verified: false};
+  if (settlementVariant === 'wrong_chain') return {...verifiedSettlement, chain_id: 31337};
+  if (settlementVariant === 'wrong_rpc') return {...verifiedSettlement, two_rpc_verified: false};
+  if (settlementVariant === 'wrong_token') return {...verifiedSettlement, token: EXECUTOR};
+  if (settlementVariant === 'wrong_amount') return {...verifiedSettlement, amount_atomic: '300001'};
+  return verifiedSettlement;
+}
 const ids = ['connect', 'switch-network', 'wallet-verify', 'grant-verify', 'budget-bind', 'allowance-approve',
   'allowance-verify', 'allowance-hash', 'preview', 'execute', 'purchase-query', 'purchase-recover', 'purchase-id',
   'revoke-prepare', 'revoke-chain', 'revoke-verify', 'revoke-hash', 'csv', 'message', 'phase', 'owner', 'chain',
@@ -334,7 +347,7 @@ const status = {owner: OWNER, chain_id: 10143, token: TOKEN, executor: EXECUTOR,
   wallet_operations: {
     approval: {transaction_hash: APPROVAL_HASH, status: 'pending'},
     revocation: {core_revoked: true, chain_grant_id: GRANT_ID, transaction_hash: REVOKE_HASH, status: 'pending'},
-  }, commerce: null};
+  }, commerce: {used_amount_usdc: '0.30', remaining_amount_usdc: '0.70', merchant_deliveries: 1}};
 const calls = [];
 let recoverCount = 0;
 async function fetch(path, options = {}) {
@@ -343,14 +356,14 @@ async function fetch(path, options = {}) {
   if (path === '/api/status') return {ok: true, status: 200, async json() { return status; }};
   if (path === '/api/purchases/purchase-1') return {ok: true, status: 200, async json() { return {
     purchase_id: 'purchase-1', preview_id: 'preview-1', state: 'payment_submitted', input_hash: '0x' + '11'.repeat(32),
-    settlement: {transaction_hash: PAYMENT_HASH, status: 'settled'}, service_result: null}; }};
+    settlement: settlement(), service_result: null}; }};
   if (path === '/api/purchases/purchase-1/recover') {
     recoverCount += 1;
     const state = recoverCount === 1 ? 'paid_but_undelivered' : 'delivered';
     return {ok: true, status: 200, async json() { return {
       purchase_id: 'purchase-1', preview_id: 'preview-1', state, input_hash: '0x' + '11'.repeat(32),
-      settlement: {transaction_hash: PAYMENT_HASH, status: 'settled'},
-      service_result: state === 'delivered' ? {rows: 2} : null}; }};
+      settlement: settlement(),
+      service_result: state === 'delivered' ? {rows: 2, settlement_mode: 'local_anvil'} : null}; }};
   }
   if (path === '/api/revoke/verify') return {ok: true, status: 200, async json() { return {
     core_revoked: true, chain_revoked: false, status: 'pending', transaction_hash: REVOKE_HASH}; }};
@@ -373,9 +386,24 @@ async function main() {
   const recoveredPending = ui.state();
   await ui.recoverPurchase();
   const recovered = ui.state();
+  await ui.connect();
+  const afterRefreshLink = nodes['tx-links'].children[0] && nodes['tx-links'].children[0].href;
+  const afterRefreshCommerce = nodes['commerce'].textContent;
+  const afterRefreshResult = nodes['result'].textContent;
+  const invalidSettlements = {};
+  for (const variant of ['unverified', 'wrong_chain', 'wrong_rpc', 'wrong_token', 'wrong_amount']) {
+    settlementVariant = variant;
+    await ui.queryPurchase();
+    invalidSettlements[variant] = {
+      link: nodes['tx-links'].children[0] && nodes['tx-links'].children[0].href,
+      commerce: nodes['commerce'].textContent,
+    };
+  }
   await ui.verifyRevoke();
   const afterRevokeRetry = ui.state();
   process.stdout.write(JSON.stringify({hydrated, queried, recoveredPending, recovered, afterRevokeRetry,
+    afterRefreshLink, afterRefreshCommerce, afterRefreshResult,
+    invalidSettlements,
     purchaseInput: nodes['purchase-id'].value, purchaseActionsEnabled, calls, recoverCount}));
 }
 main().catch(error => { console.error(error); process.exit(1); });
@@ -392,6 +420,16 @@ main().catch(error => { console.error(error); process.exit(1); });
     assert result["purchaseActionsEnabled"] is True
     assert result["recoveredPending"]["purchase_state"] == "paid_but_undelivered"
     assert result["recovered"]["purchase_state"] == "delivered"
+    assert result["afterRefreshLink"].endswith("cc" * 32)
+    assert "Monad Testnet 10143" in result["afterRefreshCommerce"]
+    assert "0.30 TestUSD" in result["afterRefreshCommerce"]
+    assert "报告含历史环境标签，实际付款以已复验的 Monad Testnet 回执为准" in result["afterRefreshCommerce"]
+    assert "merchant_deliveries" in result["afterRefreshCommerce"]
+    assert json.loads(result["afterRefreshResult"]) == {"rows": 2, "settlement_mode": "local_anvil"}
+    assert set(result["invalidSettlements"]) == {"unverified", "wrong_chain", "wrong_rpc", "wrong_token", "wrong_amount"}
+    for invalid in result["invalidSettlements"].values():
+        assert invalid["link"].endswith("bb" * 32)
+        assert "Monad Testnet 10143" not in invalid["commerce"]
     assert result["purchaseInput"] == "purchase-1"
     assert result["recoverCount"] == 2
     assert result["afterRevokeRetry"]["revoke_tx_hash"] == "0x" + "bb" * 32

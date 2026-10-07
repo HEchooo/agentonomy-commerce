@@ -43,6 +43,8 @@
     idempotencyKey: null,
     purchaseId: null,
     purchaseState: null,
+    purchaseSettlement: null,
+    purchaseServiceMode: null,
     coreRevoked: false,
     revokePrepared: false,
     revokeTransaction: null,
@@ -84,6 +86,32 @@
 
   function hash(value) {
     return typeof value === "string" && /^0x[0-9a-fA-F]{64}$/.test(value) ? value.toLowerCase() : null;
+  }
+
+  function verifiedPurchaseSettlement(value) {
+    if (!value || typeof value !== "object") return null;
+    const transactionHash = hash(value.transaction_hash);
+    const expectedToken = normalizeAddress(state.status && state.status.token);
+    if (
+      !transactionHash ||
+      value.verified !== true ||
+      value.status !== "verified" ||
+      parseChainId(value.chain_id) !== CHAIN_ID ||
+      value.receipt_status !== 1 ||
+      value.two_rpc_verified !== true ||
+      String(value.amount_atomic) !== "300000" ||
+      !expectedToken ||
+      normalizeAddress(value.token) !== expectedToken
+    ) return null;
+    return {transaction_hash: transactionHash};
+  }
+
+  function purchaseSettlementSummary() {
+    if (!state.purchaseSettlement) return null;
+    const note = state.purchaseServiceMode === "local_anvil"
+      ? "；报告含历史环境标签，实际付款以已复验的 Monad Testnet 回执为准"
+      : "";
+    return `付款已复验 · Monad Testnet ${CHAIN_ID} · 0.30 TestUSD · 付款交易 ${state.purchaseSettlement.transaction_hash}${note}`;
   }
 
   function provider() {
@@ -677,13 +705,15 @@
     state.purchaseId = result && (result.purchase_id || result.id) || state.purchaseId;
     if (result && typeof result.preview_id === "string" && result.preview_id) state.previewId = result.preview_id;
     state.purchaseState = result && (result.state || result.status) || null;
+    state.purchaseSettlement = verifiedPurchaseSettlement(result && result.settlement);
     const stateText = state.purchaseState || "尚未创建订单";
     text("purchase-status", stateText);
     const purchaseInput = $("purchase-id");
     if (state.purchaseId && purchaseInput) purchaseInput.value = state.purchaseId;
-    const settlement = result && result.settlement;
-    if (settlement && settlement.transaction_hash) addTxLink("tx-links", settlement.transaction_hash);
     const output = result && result.service_result;
+    state.purchaseServiceMode = output && typeof output === "object" && typeof output.settlement_mode === "string"
+      ? output.settlement_mode
+      : null;
     const resultNode = $("result");
     if (resultNode) resultNode.textContent = output ? JSON.stringify(output, null, 2) : "请查询／恢复当前订单。";
     return result;
@@ -887,7 +917,11 @@
       text("terms", `总额 ${field(terms, "total") || "—"} · 单笔 ${field(terms, "per_payment") || "—"} · 服务 ${field(terms, "price") || "—"} TestUSD`);
       const commerce = current.commerce;
       const commerceNode = $("commerce");
-      if (commerceNode) commerceNode.textContent = commerce ? JSON.stringify(commerce, null, 2) : "暂无订单快照";
+      if (commerceNode) {
+        const settlementSummary = purchaseSettlementSummary();
+        const commerceText = commerce ? JSON.stringify(commerce, null, 2) : "暂无订单快照";
+        commerceNode.textContent = settlementSummary ? `${settlementSummary}\n\n${commerceText}` : commerceText;
+      }
     }
     text("wallet-address", state.account || "未连接");
     text("wallet-chain", state.chainId || "未连接");
@@ -923,8 +957,12 @@
     action("revoke-verify", !(state.revokeTxHash || enteredRevokeHash) || state.chainRevoked);
     if (allowanceHash && state.allowanceTxHash && !allowanceHash.value) allowanceHash.value = state.allowanceTxHash;
     if (revokeHash && state.revokeTxHash && !revokeHash.value) revokeHash.value = state.revokeTxHash;
-    if (state.allowanceTxHash) addTxLink("tx-links", state.allowanceTxHash);
-    if (state.revokeTxHash) addTxLink("tx-links", state.revokeTxHash);
+    if (state.purchaseSettlement) {
+      addTxLink("tx-links", state.purchaseSettlement.transaction_hash);
+    } else {
+      if (state.allowanceTxHash) addTxLink("tx-links", state.allowanceTxHash);
+      if (state.revokeTxHash) addTxLink("tx-links", state.revokeTxHash);
+    }
   }
 
   function bindDom() {
