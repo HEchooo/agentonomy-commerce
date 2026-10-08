@@ -1,11 +1,11 @@
 # Public Monad deployment plan — 2026-10-08
 
 This is a bounded rollout record and remaining acceptance plan for the review
-host. It is not a complete registry registration proof or public purchase
-attestation. The host release and service are installed, and one first CREATE
-has primary-RPC receipt evidence, but its dual-RPC verification is pending. No
-second CREATE, registration send, hosted purchase, user-wallet signature, or
-two-wallet acceptance is claimed here.
+host. It records complete evidence for the two CREATE journals, the ERC-8004
+registration, and the final public HTTPS probe, but it is not a public
+purchase attestation. The host release and service are installed, and the
+identity promotion is complete; hosted purchase, user-wallet signatures, and
+two-wallet acceptance remain pending.
 
 ## Plan identity and current evidence
 
@@ -28,13 +28,13 @@ nonce-changed-after-sign regressions. Those tests do not prove live RPC
 agreement, contract deployment, registration, signing, broadcast, or public
 hosting.
 
-A fresh read-only registry pin proof passed through both configured RPCs at
-common Verified height `69180034`, block hash
+A pre-registration read-only registry pin proof passed through both configured
+RPCs at common Verified height `69180034`, block hash
 `0x583dfd95a1c0fea52c8f2c86de679b7cd03d9df1ca770ae2b954d4a2b1454a0d`,
 checked at `2026-10-08T06:08:08.479090+00:00`. It confirms only the current
-proxy/implementation code and binding. `agent_id` remains `null` and
-registration is pending; this registry-pin check records no actual signing,
-broadcast, or chain deployment.
+proxy/implementation code and binding. Its `agent_id` was `null` because this
+was before registration; it records no actual signing, broadcast, or chain
+deployment. Current registration evidence is recorded below.
 
 The final local gates are Monad 592 and canonical Core budget 21 passing;
 Commerce 25, Review 76, and Submission 6 also passed during this rollout
@@ -58,13 +58,17 @@ signing:
 | Maximum gas per CREATE | 2,000,000 |
 | Maximum total CREATE fee | 0.408 test MON |
 
-The first CREATE original transaction hash is
-`0x1c7f7a6d4506e87f1572952fff740837b338451ab63063594f5424996e495d67`.
-At least the primary RPC reports a successful receipt, but formal dual-RPC
-verification is pending. The source fix for the dynamic finalized-head
-comparison bug has passed the Monad 592 and Core 21 regression gates; the new
-release must be deployed and the original journal reverified before acceptance.
-The nonce-4 CREATE and registration nonce 5 have not been broadcast.
+The currently deployed release is
+`44fdd9fb0d228c2b6b58d4673e8ecb54bf09ba76`; its source has passed the Monad 592
+and Core 21 regression gates. The TestUSD CREATE at nonce 3 uses token
+`0x1bf06ce9eeeb9e998cecf96cd46f1a7e5bed547a` and transaction
+`0x1c7f7a6d4506e87f1572952fff740837b338451ab63063594f5424996e495d67`,
+mined in block `69187111` at Verified boundary `69189452`. The executor CREATE
+at nonce 4 uses executor
+`0x7a87b04c67c11afa7ce1a27bdb3c1c1ca55e1aa4` and transaction
+`0xb31a1954f60a2947bbeb6f67c84fbe481bf3968e20249640238e76a1de360e41`,
+mined in block `69189585` at Verified boundary `69189718`. Both journals were
+reverified through runtime, state, and receipts on both RPCs.
 
 The earlier observation at `2026-10-07T16:32:51Z` reported pending/latest
 nonce 3, gas price 102 gwei, and a 28.17173121 test MON balance from both
@@ -91,6 +95,29 @@ payments. Registration is performed once by the separate operator in the
 [registration runbook](erc8004-registration-operator.md), using the fixed
 `register(string)` call, nonce 5, zero native value, fixed 500,000 gas, and a
 gas-price cap of 150 gwei.
+
+For this rollout, nonce 5 was signed and broadcast once as transaction
+`0x039583372a8e324da28e1e8ed278ee7d57967235bae2496b9bd91bcd9592a2f0`.
+The latest read-only canonical proof reports `complete`, Agent ID `2073`,
+registration block `69189943`, finality block `69191573`, and canonical hash
+`0x32648ee0d7297e399da3f57cb294a8b6be4f20839ed29e75518a546903137bea`.
+Owner/wallet `0xbdcb39ac5ff83485cb35160f0ddaa0b7446ee009` and URI
+`https://review.agentonomy.xyz/agent.json` were identity-verified at block
+`69191587`. The root operator then atomically changed the web-owned registry
+config from `agent_id=null` to `agent_id=2073` and restarted the service. The
+loopback `/agent.json` reports `active=true`,
+`registrations=[agentId=2073, agentRegistry=eip155:10143:0x8004a818bfb912233c491871b3d84c89a494bd9e]`,
+`name=Agentonomy CSV Reconciliation`, `x402Support=false`, and
+`supportedTrust=[reputation]`. The external HTTPS probe completed with
+certificate validation enabled: `GET /agent.json` returned 200 with
+`active=true` and Agent ID `2073` bound to the expected registry;
+`/.well-known/agent-registration.json` matched this metadata; `/` returned 200
+with the new hosted-wallet UI and connect/OPC-approve controls; CSP and
+`Cache-Control: no-store` were present; anonymous `GET /api/status` returned
+401; and the browser page had no errors or warnings. The frozen plan and
+original signed transaction nonces/hashes remained unchanged; CREATE proof
+journals were updated by reconciliation, the registration journal was not
+modified, and no duplicate broadcast occurred.
 
 The maximum fee envelope remains:
 
@@ -119,13 +146,14 @@ the protected signer boundary. The web configuration remains unreadable to the
 sign account. Registration copies only non-secret network and registry pins
 into a sign-owned mode `0700` operation directory with mode `0600` files.
 
-The `64dc2c7` release is installed in a separate root-owned tree. The two
+The `44fdd9fb0d228c2b6b58d4673e8ecb54bf09ba76` release is deployed in a
+separate root-owned tree. The two
 service accounts use distinct UIDs; `agentonomy-web` cannot read
 `/etc/agentonomy-commerce/signer.json` or
 `/var/lib/agentonomy-sign/aws/credentials`, while `agentonomy-sign` cannot
 read the web-owned registry configuration. The active systemd service listens
 on `127.0.0.1:8092` behind the HTTPS proxy, and HTTP redirects to HTTPS. The
-old simulated Docker container is stopped with its data retained; old
+legacy Docker container is stopped with its data retained; old
 startup-script metadata was removed, and old unit/Caddy backups are under
 `/root/agentonomy-commerce-rollout-backup-20261008`.
 
@@ -134,15 +162,21 @@ The protected SSH/stdin installer installed the bounded session for
 which expires at `2026-10-08T18:39:35+00:00`. Its session policy permits only
 `DescribeKey`, `GetPublicKey`, and `Sign` on the two pinned KMS keys. The role,
 public-key checks, and both KMS DryRuns passed; this does not establish payment
-success. Public `/agent.json` returns the CSV Reconciliation metadata with
-`active=false`, so the service remains unregistered.
+success. The root operator atomically changed the web-owned registry config
+from `agent_id=null` to `agent_id=2073` and restarted the service. The loopback
+`/agent.json` returns the CSV Reconciliation metadata with `active=true`,
+`registrations=[agentId=2073, agentRegistry=eip155:10143:0x8004a818bfb912233c491871b3d84c89a494bd9e]`,
+`name=Agentonomy CSV Reconciliation`, `x402Support=false`, and
+`supportedTrust=[reputation]`. The external HTTPS probe is complete as recorded
+above; this is public endpoint evidence only.
 
 Temporary credentials may enter the host only through the existing protected
 SSH/stdin session installer. Use the authorized instance-level SSH public key
 registered for this VM, with the project and zone explicit on every command.
 The instance metadata is `enable-oslogin=FALSE` and
 `block-project-ssh-keys=TRUE`, so inherited project-level keys are excluded.
-Keep the private key only in the protected operator environment; never copy it
+The existing `jefffeng` instance key registration is valid for 8h. Keep the
+private key only in the protected operator environment; never copy it
 to the host, repository, or service accounts. Do not use an ambient operator
 profile, copy long-lived credentials, alter IAM policies, or edit Clink DEV/PROD.
 The registration operator remains independent of the hosted purchase signer.
@@ -153,16 +187,16 @@ validation is complete: the successful session returned the exact hostname
 `agentonomy-commerce-review-01`. The existing
 `agentonomy-commerce-iap-ssh` rule allows TCP/22 only from
 `35.235.240.0/20`, which explains why public direct SSH was not allowed. A
-separate local IAP HTTPS attempt reset; its network cause is unverified. The temporary
-`agentonomy-commerce-review-ssh-temp` rule now allows TCP/22 only from
-`45.77.70.37/32` and is bound only to the uniquely tagged
-`commerce-review-admin` review VM. Delete this temporary rule after the
-deployment; it remains active only for this deployment closeout. This verifies
-host access, protected installation, and service activation, while the CREATE
-dual-RPC proof, registration, public purchase, cloud rollout, and chain actions
-remain pending.
+separate local IAP HTTPS attempt reset; its network cause is unverified. The
+temporary `agentonomy-commerce-review-ssh-temp` rule was deleted successfully
+after deployment. The remaining `agentonomy-commerce-iap-ssh` rule is the only
+TCP/22 rule for this target, limited to source `35.235.240.0/20` and target
+`commerce-review-admin`; public direct TCP/22 remains disallowed. This verifies
+host access, protected installation, service activation, both CREATE journal
+re-verifications, canonical registration, loopback identity promotion, and the
+external HTTPS probe. Public purchase and user-wallet actions remain pending.
 For historical context, the prior OS Login attempt on 2026-10-08 was denied
-because the operator account `2035629471qq@gmail.com` lacked the
+because the existing operator account lacked the
 administrator-granted `roles/compute.osLoginExternalUser` role on the external
 organization. That denial was specific to the previous OS Login method and is
 not a current blocker for the authorized instance-level path.
@@ -179,24 +213,29 @@ not a current blocker for the authorized instance-level path.
 3. Obtain a new bounded temporary role session through the protected
    SSH/stdin installer. Verify the pinned assumed role and KMS DryRun without
    exposing credentials or generating a transaction.
-4. Deploy the new release containing the finalized-head comparison fix and
-   reverify the original first-CREATE journal. Then reconcile and independently
-   verify that CREATE through both RPCs; only then execute and independently
-   verify the nonce-4 CREATE. Do not broadcast nonce 4 while the first proof is
-   incomplete.
-5. Publish the pending `/agent.json`, prepare the nonce-5 registration, and
-   run the separate registration operator once. Reconcile the original hash
-   and set only the proven `agent_id` after the dual-RPC identity proof.
-6. Verify the public identity, receiving-wallet binding, HTTPS origin, and
-   metadata. Then hand wallet signatures to the user for the finite grant,
-   approve, one `0.30` TestUSD purchase, replay without a second charge,
-   second-wallet isolation, and revocation checks. Optional feedback requires
-   its own explicit wallet action.
+4. Completed: deploy the current release containing the finalized-head
+   comparison fix, reverify the nonce-3 journal, and independently verify the
+   nonce-4 CREATE through both RPCs. Runtime, state, and receipts passed at the
+   recorded Verified boundaries; do not rebroadcast either transaction.
+5. Completed: run the separate registration operator once at nonce 5 and
+   reconcile its original hash. The canonical CLI reports Agent ID `2073` and
+   the owner, wallet, URI, and finality evidence recorded above; the frozen
+   plan and original signed transaction nonces/hashes remained unchanged,
+   CREATE proof journals were updated by reconciliation, the registration
+   journal was not modified, and no duplicate broadcast occurred.
+6. The final public HTTPS probe and public identity re-verification are
+   complete after the loopback promotion. Then hand the required wallet actions to the user: EIP-191 login,
+   one TestUSD claim, business-budget/EIP-712 finite approve, OPC consent, one
+   `0.30` TestUSD purchase, replay without a second charge, second-wallet
+   isolation, revocation, feedback, and video checks. The old local one-wallet
+   delivery is historical evidence only and cannot substitute for this public
+   flow.
 
-Every step needs fresh evidence before it is described as complete. The old
-public review endpoint remains a simulated review service until these gates
-finish; local Anvil fixtures, mock RPCs, unsigned plans, and historical
-observations cannot be presented as live ERC-8004 or payment evidence.
+Every step needs fresh evidence before it is described as complete. The current
+systemd-backed review service is deployed, while public purchase and wallet
+acceptance remain open; local Anvil fixtures, mock RPCs, unsigned plans,
+and historical observations cannot be presented as live ERC-8004 or payment
+evidence.
 
 The ERC-8004 interface and event ABI reference remains the immutable official
 contracts source pinned at:

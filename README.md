@@ -96,23 +96,22 @@ ERC-8004 Validation 仍是未来工作。registration-v1 metadata 的
 公共 MCP endpoint 或 x402 能力。
 
 ERC-8004 的配置、来源 pin、CLI、反馈隐私和失败/恢复边界见
-[ERC-8004 setup and operations](docs/monad/erc8004.md)。截至 2026-10-08，当前已
-观察到的验证门禁为：`make test-monad` 的 Monad pytest 部分 549 passed，另有
-21 个 canonical Core budget tests passed；`make test-contracts` 64 passed，
-`make test-commerce` 25 passed，`make test-review` 76 passed，
-`make test-submission` 6 passed，canonical Core OPC 108 passed，Node OPC/MCP
-121 passed。跨页面发送、未知结果恢复、服务端原交易哈希恢复及旧页面回归的
-32 项测试已通过独立复核；本地匿名浏览器检查未见控制台错误。
+[ERC-8004 setup and operations](docs/monad/erc8004.md)。截至 2026-10-08，最新
+release gate 记录为 Monad pytest 592 passed（45.11 秒）和 21 个 canonical
+Core budget tests passed（2.34 秒）。`make test-contracts` 64、`make
+test-commerce` 25、`make test-review` 76、`make test-submission` 6、canonical
+Core OPC 108 和 Node OPC/MCP 121 是此前记录的门禁；这里不宣称它们在本次
+rollout 中重新完整运行。跨页面发送、未知结果恢复、服务端原交易哈希恢复及旧
+页面回归的 32 项测试已通过独立复核；本地匿名浏览器检查未见控制台错误。
 
 ERC-8004 的本地链测试使用 chain 31337 上明确标注的 test-only Solidity registry
 fixture；两个观察路径复用同一个 Anvil endpoint。它只证明 adapter 的接口、ABI、
 event 和失败边界，不是官方 proxy、live independent RPC、Monad live registry，
-也不是完整 Core acceptance。当前没有新的 live signing、broadcast 或 cloud
-deployment 变更；旧的 public endpoint 仍是 earlier simulated review service。
-新的 hosted 公网 rollout、GCP OS Login 权限、实际 Agent registration 和
-receiving-wallet binding，以及双钱包 HTTPS purchase/feedback acceptance 与视频
-仍待完成；真实部署必须使用 HTTPS 和配置中完全一致的 origin。本文不宣称新的
-live registry registration，也不宣称使用官方 USDC。
+也不是完整 Core acceptance。当前 rollout 已有独立的 review VM 部署、Monad
+合约双 RPC 验收、ERC-8004 registration proof 和外部 HTTPS identity probe；
+这些 live 证据与本地 fixture 分开记录。真实部署必须使用 HTTPS 和配置中完全
+一致的 origin。当前仍未完成用户钱包 purchase/recovery、revoke、two-wallet、
+feedback 和 video acceptance；本文不宣称使用官方 USDC。
 
 反馈发送必须经过明确的 `prepare -> inspect disclosure -> send` 顺序：先冻结
 买方地址、分数、付款交易和结果摘要，再由用户查看 disclosure 并点击发送。每个
@@ -127,6 +126,35 @@ originating lock 的流程内清除 marker。这个协调范围只覆盖同源�
 保留原 browser metadata，并先核对原钱包交易。Backend 只在提交 tx hash 后约束原
 候选，不宣称跨设备排除 unknown。
 
+## Latest public Monad rollout status
+
+As of 2026-10-08, release `44fdd9fb0d228c2b6b58d4673e8ecb54bf09ba76` is
+deployed on the dedicated `agentonomy-commerce-review-01` VM in
+`blockchain-nodeservice/asia-southeast1-b`. The systemd web service runs on
+loopback `127.0.0.1:8092` behind Caddy at
+[`https://review.agentonomy.xyz`](https://review.agentonomy.xyz). The old
+simulated Docker service is stopped with its data retained, and its startup
+script was removed.
+
+The TestUSD and budget-executor CREATE journals are complete with dual-RPC
+receipt, finality, code and constructor checks. The ERC-8004 registration is
+complete for Agent ID `2073`; both loopback and external HTTPS `agent.json`
+responses are `active=true` with the verified registration metadata. Independent
+onchain registration proof binds the URI and receiving wallet. The
+fresh external probe verified the HTTPS certificate, returned HTTP 200 for
+`/agent.json`, and the well-known registration document matched it; the hosted
+wallet page also returned HTTP 200, with the expected connect/OPC-approve
+identifiers, CSP and `Cache-Control: no-store`. Anonymous `/api/status`
+returned 401. A fresh buyer login, 1.00 TestUSD claim, business-budget and
+EIP-712 grant, finite allowance, OPC consent, 0.30 CSV purchase, same-order
+recovery, revoke, second-wallet, feedback and video acceptance are also still
+pending. The temporary single-IP SSH rule was removed; only the original
+`agentonomy-commerce-iap-ssh` TCP/22 rule from `35.235.240.0/20` targeting
+`commerce-review-admin` remains, and the web backend exposes only loopback
+`127.0.0.1:8092` behind the Caddy HTTPS front end.
+The [public rollout acceptance record](docs/monad/public-rollout-acceptance-20261008.md)
+contains the public proof, explorer links and exact remaining gates.
+
 ## Monad budget-contract implementation
 
 A separate real local-EVM composition now adds an owner-signed EIP-712 budget,
@@ -137,7 +165,14 @@ Start with [the quickstart](docs/monad/quickstart.md),
 [public deployment prerequisites](docs/monad/deployment.md).
 The [external OKX wallet and dedicated KMS operator path](docs/monad/kms-quickstart.md)
 adds bounded signing, wallet setup, and recovery of the original paid order.
-The Monad contracts are deployed and verified through both RPCs, and OKX authorization is complete. A real 0.30 TestUSD payment was initiated on chain 10143; the API order is `delivered`, and the CSV report was delivered once. Same-order recovery/query returned the identical report without a second payment. The receipt is verified through both RPCs, with 0.70 TestUSD remaining. See [role-session acceptance](docs/monad/role-session-acceptance.md) and [recording checklist](docs/monad/recording-checklist.md) for transaction and recovery evidence. Core/onchain revocation, recording, and final submission remain pending. The public review service remains explicitly simulated.
+The Monad contracts are deployed and verified through both RPCs, and the earlier
+OKX canary authorization produced one real 0.30 TestUSD payment on chain 10143.
+That historical API order is `delivered`; same-order recovery/query returned the
+identical report without a second payment. See [role-session acceptance](docs/monad/role-session-acceptance.md)
+and [recording checklist](docs/monad/recording-checklist.md) for the historical
+transaction and recovery evidence. It does not replace acceptance of the new
+public hosted wallet flow; the new public purchase, recovery, revocation,
+two-wallet, feedback, recording and final submission remain pending.
 
 The new own-wallet website implementation is in
 `examples/monad_commerce/hosted_*`. It adds browser wallet proof, isolated
@@ -151,24 +186,28 @@ See [public implementation readiness](docs/monad/public-live-readiness.md),
 [hosted operations](docs/monad/hosted-operations.md), and the
 [ERC-8004 setup guide](docs/monad/erc8004.md). The ERC-8004 implementation has
 local verification and the imported regression gates recorded above, including
-same-profile cross-tab exclusion and original-candidate recovery. The public endpoint
-still serves the earlier simulated review
-product. New hosted public rollout, GCP permission, actual Agent registration and
-receiving-wallet binding, and two-wallet HTTPS purchase/feedback acceptance and video
-remain pending. The previous deployed contracts and real one-wallet order above are
-unchanged.
+same-profile cross-tab exclusion and original-candidate recovery. The new release
+is deployed on the dedicated review VM and the loopback `agent.json` identity is
+promoted after complete registration proof. The public HTTPS identity probe now
+passes, including active Agent metadata and the hosted wallet page. Public wallet
+purchase/recovery, revocation, second-wallet isolation, feedback and video
+acceptance remain pending. The previous deployed contracts and real one-wallet
+order above are unchanged and are labelled historical in the
+[recording checklist](docs/monad/recording-checklist.md).
 
 公网发布准备还包括一个独立的
 [ERC-8004 registration operator](docs/monad/erc8004-registration-operator.md)。
 它复用现有 KMS、私有交易 journal 和双 RPC 验证，只允许固定服务 URI 的一次
 注册；网页购买 signer 保持原有范围。注册消耗 nonce 5，购买继续使用 nonce
 6–13，合计 gas 费用上限保持 1.083 test MON。网页 registry 配置放在 web 用户
-自己的受保护目录中，与签名配置和临时 AWS 凭据分开。当前发布准备回归为
-590 个 Monad tests、21 个 Core budget tests、25 个 Commerce tests、76 个
-Review tests 和 6 个 Submission tests 通过；注册工具其中有 40 项局部测试。
-操作顺序和只读证据见
-[public deployment plan](docs/monad/public-deployment-plan-20261008.md)。这些准备
-不代表新的公网部署或交易已完成。
+自己的受保护目录中，与签名配置和临时 AWS 凭据分开。当前 release gate
+记录为 592 个 Monad tests（45.11 秒）和 21 个 canonical Core budget tests
+（2.34 秒）通过；64 个 contracts、25 个 Commerce、76 个 Review、6 个
+Submission、108 个 Core OPC 和 121 个 Node OPC/MCP 计数是此前记录的门禁，
+不在这里宣称重新完整运行。注册工具其中有 40 项局部测试。操作顺序和只读
+证据见 [public deployment plan](docs/monad/public-deployment-plan-20261008.md)。
+这些准备已经包含新的 review VM 部署、合约 CREATE 和 registration 证据；但
+不代表用户钱包 purchase 或完整公网验收已完成。
 
 ## Run locally
 
@@ -191,6 +230,9 @@ See [demo instructions and MCP client setup](docs/demo.md) for the full flow,
 expected evidence and simulated boundaries.
 
 ## Persistent review service
+
+This section describes the local review composition and its simulated settlement;
+it is separate from the newly deployed hosted Monad release documented above.
 
 The review API provides a **real HTTP CSV reconciliation merchant** over the
 same Core authorization and Marketplace purchase logic. Settlement is explicitly
