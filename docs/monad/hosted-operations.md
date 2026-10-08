@@ -31,6 +31,16 @@ Use two non-root service accounts:
 * `agentonomy-web` owns the hosted application state and systemd process.
 * `agentonomy-sign` owns `/var/lib/agentonomy-sign/aws`, which is mode `0700`.
 
+The web-owned state/config parent is `/var/lib/agentonomy-web`, and it must be
+mode `0700`. Keep `configuration.json`, the `state/` directory, and the public
+ERC-8004 registry pins in this tree. Store the registry pins at
+`/var/lib/agentonomy-web/erc8004.json` as a regular single-link file owned by
+`agentonomy-web` with mode `0600`. It contains public registry, Agent, owner,
+URI, and code-hash pins only; it must not contain credentials, session tokens,
+private keys, or transaction signing material. The hosted server's protected
+reader relies on this ownership and mode and rejects links or other unsafe
+filesystem objects.
+
 The release at `/opt/agentonomy-commerce/current` and its virtual environment
 are root-owned and not writable by either service account. Install the fixed
 launcher at `/usr/local/libexec/agentonomy-monad-sign` as root. The launcher
@@ -44,6 +54,17 @@ mode `0600`, so only the dedicated signer can read or change this fixed scope.
 The release installer and web user must not be able to rewrite it. It contains
 the fixed account, region, KMS key ARNs, and scope only. Do not put a
 credential, session token, private key, or raw transaction in this file.
+
+Before starting the service, the root operator must verify that both config
+files are regular single-link files with no group or other permissions:
+`/var/lib/agentonomy-web/erc8004.json` is owned by `agentonomy-web` and mode
+`0600`, while `/etc/agentonomy-commerce/signer.json` is owned by
+`agentonomy-sign` and mode `0600`. The two parent directories remain mode
+`0700`. A check as `agentonomy-web` must be able to read the web-owned public
+registry config and must not read the protected signer scope. A check as
+`agentonomy-sign` must be able to read its protected signer scope and must not
+read the web-owned registry config; do not widen either directory or file
+permission to make the other account's config readable.
 
 The installer writes only these files under
 `/var/lib/agentonomy-sign/aws`:

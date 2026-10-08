@@ -158,6 +158,18 @@ receiving-wallet binding, and two-wallet HTTPS purchase/feedback acceptance and 
 remain pending. The previous deployed contracts and real one-wallet order above are
 unchanged.
 
+公网发布准备还包括一个独立的
+[ERC-8004 registration operator](docs/monad/erc8004-registration-operator.md)。
+它复用现有 KMS、私有交易 journal 和双 RPC 验证，只允许固定服务 URI 的一次
+注册；网页购买 signer 保持原有范围。注册消耗 nonce 5，购买继续使用 nonce
+6–13，合计 gas 费用上限保持 1.083 test MON。网页 registry 配置放在 web 用户
+自己的受保护目录中，与签名配置和临时 AWS 凭据分开。当前发布准备回归为
+590 个 Monad tests、21 个 Core budget tests、25 个 Commerce tests、76 个
+Review tests 和 6 个 Submission tests 通过；注册工具其中有 40 项局部测试。
+操作顺序和只读证据见
+[public deployment plan](docs/monad/public-deployment-plan-20261008.md)。这些准备
+不代表新的公网部署或交易已完成。
+
 ## Run locally
 
 Use Python 3.12 for the reproducible environment below.
