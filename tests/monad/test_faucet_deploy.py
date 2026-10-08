@@ -174,6 +174,39 @@ class _Rpc:
         raise AssertionError(f"unexpected RPC call: {method}")
 
 
+class _DivergentFinalityRpc(_Rpc):
+    def call(self, method: str, params: list[object]) -> object:
+        if method == "eth_getBlockByNumber" and params[0] == "finalized":
+            if self.url == faucet_deploy.RPC_URLS[1]:
+                return {"number": "0x15", "hash": "0x" + "aa" * 32}
+            return {"number": "0x14", "hash": "0x" + "ff" * 32}
+        return super().call(method, params)
+
+
+class _BoundaryDisagreementRpc(_Rpc):
+    def call(self, method: str, params: list[object]) -> object:
+        if (
+            method == "eth_getBlockByNumber"
+            and params[0] == "0x11"
+            and self.url == faucet_deploy.RPC_URLS[1]
+        ):
+            return {"number": "0x11", "hash": "0x" + "dd" * 32}
+        return super().call(method, params)
+
+
+class _BoundaryChangesDuringQueryRpc(_Rpc):
+    def call(self, method: str, params: list[object]) -> object:
+        if method == "eth_getBlockByNumber" and params[0] == "0x11":
+            reads = self.state.setdefault("boundary_reads", {})
+            assert isinstance(reads, dict)
+            read_count = reads.get(self.url, 0)
+            assert isinstance(read_count, int)
+            reads[self.url] = read_count + 1
+            if read_count >= 1 and self.url == faucet_deploy.RPC_URLS[1]:
+                return {"number": "0x12", "hash": "0x" + "dd" * 32}
+        return super().call(method, params)
+
+
 def _configure_rpc(plan: dict[str, object]) -> None:
     _Rpc.shared = {
         "plan": plan,
@@ -233,20 +266,81 @@ def test_receipt_contract_mutation_blocks_replay(tmp_path: Path, monkeypatch: py
     assert replay["pending"] is False
 
 
-def test_replay_waits_when_finalized_head_hashes_disagree(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+def test_replay_accepts_different_finalized_heads_when_common_boundary_is_stable(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
     plan = _plan(tmp_path, monkeypatch)
     _configure_rpc(plan)
-    journal = tmp_path / "finalized-hash-disagreement.json"
+    journal = tmp_path / "different-finalized-heads.json"
+    complete = faucet_deploy.run_deployment(
+        plan, journal, execute=True, signer_factory=lambda: _Signer(), rpc_factory=_DivergentFinalityRpc, root=tmp_path
+    )
+    assert complete["status"] == "complete"
+    assert complete["finalized_boundary"] == 17
+
+    replay = faucet_deploy.run_deployment(plan, journal, execute=False, rpc_factory=_DivergentFinalityRpc, root=tmp_path)
+
+    assert replay["status"] == "complete"
+    assert replay["pending"] is False
+
+
+def test_replay_waits_when_fixed_boundary_blocks_disagree_without_resigning_or_broadcasting(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    plan = _plan(tmp_path, monkeypatch)
+    _configure_rpc(plan)
+    journal = tmp_path / "boundary-disagreement.json"
     complete = faucet_deploy.run_deployment(
         plan, journal, execute=True, signer_factory=lambda: _Signer(), rpc_factory=_Rpc, root=tmp_path
     )
     assert complete["status"] == "complete"
+    send_count = _Rpc.shared["send_count"]
 
-    _Rpc.shared["diverge_finalized_hash"] = True
-    replay = faucet_deploy.run_deployment(plan, journal, execute=False, rpc_factory=_Rpc, root=tmp_path)
+    def fail_signer() -> object:
+        raise AssertionError("boundary disagreement must not sign")
+
+    replay = faucet_deploy.run_deployment(
+        plan,
+        journal,
+        execute=True,
+        signer_factory=fail_signer,
+        rpc_factory=_BoundaryDisagreementRpc,
+        root=tmp_path,
+    )
 
     assert replay["status"] == "pending"
     assert replay["pending"] is True
+    assert _Rpc.shared["send_count"] == send_count
+
+
+def test_replay_waits_when_fixed_boundary_changes_during_recheck_without_resigning_or_broadcasting(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    plan = _plan(tmp_path, monkeypatch)
+    _configure_rpc(plan)
+    journal = tmp_path / "boundary-recheck-change.json"
+    complete = faucet_deploy.run_deployment(
+        plan, journal, execute=True, signer_factory=lambda: _Signer(), rpc_factory=_Rpc, root=tmp_path
+    )
+    assert complete["status"] == "complete"
+    send_count = _Rpc.shared["send_count"]
+    _Rpc.shared["boundary_reads"] = {}
+
+    def fail_signer() -> object:
+        raise AssertionError("boundary change must not sign")
+
+    replay = faucet_deploy.run_deployment(
+        plan,
+        journal,
+        execute=True,
+        signer_factory=fail_signer,
+        rpc_factory=_BoundaryChangesDuringQueryRpc,
+        root=tmp_path,
+    )
+
+    assert replay["status"] == "pending"
+    assert replay["pending"] is True
+    assert _Rpc.shared["send_count"] == send_count
 
 
 def test_unknown_broadcast_keeps_journal_and_does_not_retry_or_resign(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:

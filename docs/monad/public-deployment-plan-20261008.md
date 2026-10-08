@@ -1,9 +1,11 @@
 # Public Monad deployment plan — 2026-10-08
 
-This is a bounded preparation plan for the review host. It is not a live
-deployment record, registry registration proof, or public purchase attestation.
-No new CREATE transaction, registration send, hosted rollout, user-wallet
-signature, or two-wallet acceptance is claimed here.
+This is a bounded rollout record and remaining acceptance plan for the review
+host. It is not a complete registry registration proof or public purchase
+attestation. The host release and service are installed, and one first CREATE
+has primary-RPC receipt evidence, but its dual-RPC verification is pending. No
+second CREATE, registration send, hosted purchase, user-wallet signature, or
+two-wallet acceptance is claimed here.
 
 ## Plan identity and current evidence
 
@@ -31,17 +33,18 @@ common Verified height `69180034`, block hash
 `0x583dfd95a1c0fea52c8f2c86de679b7cd03d9df1ca770ae2b954d4a2b1454a0d`,
 checked at `2026-10-08T06:08:08.479090+00:00`. It confirms only the current
 proxy/implementation code and binding. `agent_id` remains `null` and
-registration is pending; this update records no actual signing, broadcast, or
-cloud change.
+registration is pending; this registry-pin check records no actual signing,
+broadcast, or chain deployment.
 
-The final local gates are Monad 590 and canonical Core budget 21 passing;
+The final local gates are Monad 592 and canonical Core budget 21 passing;
 Commerce 25, Review 76, and Submission 6 also passed during this rollout
 preparation. They do not certify public deployment or registration.
 
 ## Fixed contract creation proposal
 
 The existing proposal keeps the two CREATE operations at nonces 3 and 4.
-Their historical pins remain subject to fresh verification before any signing:
+Their historical pins remain subject to fresh verification before any further
+signing:
 
 | Field | Proposed value |
 | --- | --- |
@@ -54,6 +57,14 @@ Their historical pins remain subject to fresh verification before any signing:
 | Legacy gas price in the previous proposal | 102 gwei |
 | Maximum gas per CREATE | 2,000,000 |
 | Maximum total CREATE fee | 0.408 test MON |
+
+The first CREATE original transaction hash is
+`0x1c7f7a6d4506e87f1572952fff740837b338451ab63063594f5424996e495d67`.
+At least the primary RPC reports a successful receipt, but formal dual-RPC
+verification is pending. The source fix for the dynamic finalized-head
+comparison bug has passed the Monad 592 and Core 21 regression gates; the new
+release must be deployed and the original journal reverified before acceptance.
+The nonce-4 CREATE and registration nonce 5 have not been broadcast.
 
 The earlier observation at `2026-10-07T16:32:51Z` reported pending/latest
 nonce 3, gas price 102 gwei, and a 28.17173121 test MON balance from both
@@ -108,31 +119,71 @@ the protected signer boundary. The web configuration remains unreadable to the
 sign account. Registration copies only non-secret network and registry pins
 into a sign-owned mode `0700` operation directory with mode `0600` files.
 
-Temporary credentials may enter the host only through the existing protected
-SSH/stdin session installer. Do not use an ambient operator profile, copy
-long-lived credentials, alter IAM policies, or edit Clink DEV/PROD. The
-registration operator remains independent of the hosted purchase signer.
+The `64dc2c7` release is installed in a separate root-owned tree. The two
+service accounts use distinct UIDs; `agentonomy-web` cannot read
+`/etc/agentonomy-commerce/signer.json` or
+`/var/lib/agentonomy-sign/aws/credentials`, while `agentonomy-sign` cannot
+read the web-owned registry configuration. The active systemd service listens
+on `127.0.0.1:8092` behind the HTTPS proxy, and HTTP redirects to HTTPS. The
+old simulated Docker container is stopped with its data retained; old
+startup-script metadata was removed, and old unit/Caddy backups are under
+`/root/agentonomy-commerce-rollout-backup-20261008`.
 
-The current external access blocker is exact: the operator account
-`2035629471qq@gmail.com` needs the administrator-granted
-`roles/compute.osLoginExternalUser` role on the external organization for the
-review VM. The missing role is organization-level; operations in this rollout
-remain restricted to the review VM. Until that administrator action
-is completed, do not claim that the installer, service, CREATEs, registration,
-or public purchase have run remotely. Do not bypass the blocker through DEV,
-instance metadata, another identity, or a copied SSH key.
+The protected SSH/stdin installer installed the bounded session for
+`arn:aws:sts::793643674201:assumed-role/agentonomy-dev-kms-runtime/commerce-review-20261008`,
+which expires at `2026-10-08T18:39:35+00:00`. Its session policy permits only
+`DescribeKey`, `GetPublicKey`, and `Sign` on the two pinned KMS keys. The role,
+public-key checks, and both KMS DryRuns passed; this does not establish payment
+success. Public `/agent.json` returns the CSV Reconciliation metadata with
+`active=false`, so the service remains unregistered.
+
+Temporary credentials may enter the host only through the existing protected
+SSH/stdin session installer. Use the authorized instance-level SSH public key
+registered for this VM, with the project and zone explicit on every command.
+The instance metadata is `enable-oslogin=FALSE` and
+`block-project-ssh-keys=TRUE`, so inherited project-level keys are excluded.
+Keep the private key only in the protected operator environment; never copy it
+to the host, repository, or service accounts. Do not use an ambient operator
+profile, copy long-lived credentials, alter IAM policies, or edit Clink DEV/PROD.
+The registration operator remains independent of the hosted purchase signer.
+
+Switching this review VM from OS Login to its instance-level SSH public key was
+explicitly authorized and the instance metadata has been applied. SSH
+validation is complete: the successful session returned the exact hostname
+`agentonomy-commerce-review-01`. The existing
+`agentonomy-commerce-iap-ssh` rule allows TCP/22 only from
+`35.235.240.0/20`, which explains why public direct SSH was not allowed. A
+separate local IAP HTTPS attempt reset; its network cause is unverified. The temporary
+`agentonomy-commerce-review-ssh-temp` rule now allows TCP/22 only from
+`45.77.70.37/32` and is bound only to the uniquely tagged
+`commerce-review-admin` review VM. Delete this temporary rule after the
+deployment; it remains active only for this deployment closeout. This verifies
+host access, protected installation, and service activation, while the CREATE
+dual-RPC proof, registration, public purchase, cloud rollout, and chain actions
+remain pending.
+For historical context, the prior OS Login attempt on 2026-10-08 was denied
+because the operator account `2035629471qq@gmail.com` lacked the
+administrator-granted `roles/compute.osLoginExternalUser` role on the external
+organization. That denial was specific to the previous OS Login method and is
+not a current blocker for the authorized instance-level path.
 
 ## Acceptance order
 
 1. Preserve the historical plan hash and prepare a fresh local plan from the
    reviewed artifacts. Confirm the two fixed RPC URLs and the current pending
    nonce before any signing.
-2. Restore OS Login for the exact review VM, inventory the host, install the
+2. Use the authorized instance-level SSH public key on the exact review VM,
+   with `enable-oslogin=FALSE` and `block-project-ssh-keys=TRUE` applied only
+   there. With SSH validation complete, inventory the host, install the
    root-owned release, and verify the web/signer file ownership boundaries.
 3. Obtain a new bounded temporary role session through the protected
    SSH/stdin installer. Verify the pinned assumed role and KMS DryRun without
    exposing credentials or generating a transaction.
-4. Execute and independently verify CREATE3 and CREATE4 through both RPCs.
+4. Deploy the new release containing the finalized-head comparison fix and
+   reverify the original first-CREATE journal. Then reconcile and independently
+   verify that CREATE through both RPCs; only then execute and independently
+   verify the nonce-4 CREATE. Do not broadcast nonce 4 while the first proof is
+   incomplete.
 5. Publish the pending `/agent.json`, prepare the nonce-5 registration, and
    run the separate registration operator once. Reconcile the original hash
    and set only the proven `agent_id` after the dual-RPC identity proof.

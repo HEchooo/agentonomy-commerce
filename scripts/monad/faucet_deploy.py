@@ -909,10 +909,6 @@ def _reconcile_record(plan: Mapping[str, object], record: Mapping[str, object], 
     proof_b = observations[1]["proof"]
     if proof_a != proof_b:
         raise PendingEvidence("RPC deployment transaction evidence disagrees temporarily")
-    finalized_hash_a = observations[0]["finalized_hash"]
-    finalized_hash_b = observations[1]["finalized_hash"]
-    if finalized_hash_a != finalized_hash_b:
-        raise PendingEvidence("RPC finalized block observations disagree temporarily")
     finality_a = observations[0]["finalized_number"]
     finality_b = observations[1]["finalized_number"]
     assert isinstance(finality_a, int) and isinstance(finality_b, int)
@@ -962,6 +958,22 @@ def _reconcile_record(plan: Mapping[str, object], record: Mapping[str, object], 
         identity_values.append(identity)
     if identity_values[0] != identity_values[1]:
         raise PendingEvidence("RPC deployed contract identity observations disagree temporarily")
+    rechecked_boundary_blocks = []
+    for client in clients:
+        boundary_block = _rpc_call(client, "eth_getBlockByNumber", [boundary_tag, False])
+        if not isinstance(boundary_block, dict):
+            raise PendingEvidence("RPC verified boundary recheck is temporarily unavailable")
+        try:
+            rechecked_boundary_blocks.append(
+                {
+                    "number": _quantity(boundary_block.get("number"), name="boundary number"),
+                    "hash": _hash(boundary_block.get("hash"), name="boundary hash"),
+                }
+            )
+        except OperatorError:
+            raise PendingEvidence("RPC verified boundary recheck is temporarily malformed") from None
+    if rechecked_boundary_blocks != boundary_blocks:
+        raise PendingEvidence("RPC verified boundary changed during reconciliation")
     code_hash = "0x" + keccak(code_values[0]).hex()
     return {
         "status": "verified",

@@ -2,9 +2,42 @@
 
 This runbook covers the isolated review host `agentonomy-commerce-review-01`.
 It is a preparation and rotation guide, not evidence that the hosted product is
-currently live. The public review deployment, contract creation, funding, and
-delivery still need their own verified evidence before they are described as
-live in a submission or recording.
+fully live or accepted. The review host release and service are now installed
+and verified, while contract finality, registration, funding, delivery, and
+wallet acceptance still need their own evidence before they are described as
+complete in a submission or recording.
+
+## Verified rollout state — 2026-10-08
+
+The `64dc2c7` release is installed in a separate root-owned tree on the review
+host. `agentonomy-web` and `agentonomy-sign` use distinct UIDs. The web account
+cannot read `/etc/agentonomy-commerce/signer.json` or
+`/var/lib/agentonomy-sign/aws/credentials`, and the sign account cannot read
+the web-owned registry configuration. The protected SSH/stdin installer
+installed the bounded session for
+`arn:aws:sts::793643674201:assumed-role/agentonomy-dev-kms-runtime/commerce-review-20261008`,
+which expires at `2026-10-08T18:39:35+00:00`. Its session policy is limited to
+`DescribeKey`, `GetPublicKey`, and `Sign` on the two pinned KMS keys. The role
+identity, public-key checks, and both KMS signing DryRuns passed; this is an AWS
+access result and is not payment success.
+
+The new systemd service is active as `agentonomy-web` on `127.0.0.1:8092`,
+with the HTTPS proxy in front; HTTP requests redirect to HTTPS. The old
+simulated Docker container is stopped and its data is retained. The old
+startup-script metadata was removed to prevent rollback, and the old unit and
+Caddy configuration are backed up under
+`/root/agentonomy-commerce-rollout-backup-20261008`.
+
+The public `/agent.json` currently returns the CSV Reconciliation metadata with
+`active=false`; the service is not registered. The first CREATE original
+transaction hash is
+`0x1c7f7a6d4506e87f1572952fff740837b338451ab63063594f5424996e495d67`.
+At least the primary RPC reports a successful receipt, but formal dual-RPC
+verification is pending. The source fix for the dynamic finalized-head
+comparison bug has passed the Monad 592 and Core 21 regression gates; the new
+release must be deployed and the original journal reverified before that
+acceptance can finish. Nonce 4 and nonce 5 have not been broadcast, and the
+user-wallet steps remain pending.
 
 ## Boundaries
 
@@ -82,34 +115,51 @@ Changed contents are copied into a root-owned `0700` directory under
 Run the existing protected AWS operator flow on the review host. It must invoke
 the new installer through stdin and keep the AssumeRole JSON out of logs,
 shell history, chat, and the repository. The following is a placeholder for
-that protected operator stream, using the configured GCP OS Login path; it is
-not a directly runnable command until the operator has produced the bounded
-AssumeRole result:
+that protected operator stream, using the authorized instance-level SSH public
+key path on this VM; it is not a directly runnable command until the operator
+has produced the bounded AssumeRole result:
 
 ```text
 <protected AssumeRole result> | /opt/homebrew/bin/gcloud compute ssh agentonomy-commerce-review-01 \
   --project=blockchain-nodeservice \
   --zone=asia-southeast1-b \
-  --command='sudo /opt/agentonomy-commerce/current/.venv/bin/python -m scripts.monad.install_hosted_session'
+  --command='cd /opt/agentonomy-commerce/current && sudo /opt/agentonomy-commerce/current/.venv/bin/python -m scripts.monad.install_hosted_session'
 ```
 
-Keep the project and zone explicit for every invocation. Do not change the
-global gcloud configuration, switch accounts, or replace OS Login with a
-copied SSH key. The command must run on the exact hostname. It accepts at most
-32 KiB and prints only `status` and `expires_at` on success. A failed
-validation prints a
-generic error and never prints the input or an AWS exception. The current
-GCP/OS Login blocker is that the operator account still needs
-`roles/compute.osLoginExternalUser`; until an administrator grants that role,
-do not claim that the installer or the service has been remotely run.
+Keep the project and zone explicit for every invocation and run the command on
+the exact hostname. This host is authorized to use its current bounded
+instance-level SSH public key registration, matching the DEV access pattern.
+Root has applied
+`enable-oslogin=FALSE` and `block-project-ssh-keys=TRUE` to this instance only,
+so inherited project-level SSH keys are not accepted. Keep the corresponding
+private key only in the protected operator environment; never copy it to the
+VM, repository, or service accounts. Do not change the global gcloud
+configuration, switch accounts, or alter any other host; Clink DEV and PROD
+remain untouched. SSH connectivity is now verified: the successful session
+returned the exact hostname `agentonomy-commerce-review-01`. The existing
+`agentonomy-commerce-iap-ssh` firewall rule allows TCP/22 only from
+`35.235.240.0/20`, which explains why public direct SSH was not allowed. A
+separate local IAP HTTPS attempt reset; its network cause is unverified. The temporary
+`agentonomy-commerce-review-ssh-temp` rule now allows TCP/22 only from
+`45.77.70.37/32` and is bound only to the uniquely tagged
+`commerce-review-admin` review VM. Delete this temporary rule after the
+deployment; it remains active only for this deployment closeout and is not a
+permanent access path. Host access, protected installation, and service start
+are verified, but the public rollout and chain actions remain pending.
 
-After the protected install, the root operator should verify the assumed-role
-identity and perform the signer's configured DryRun using the protected signer
-path. The AWS account, assumed-role ARN, KMS key ID/ARN, and public chain
-addresses from that check are safe to report as status facts. Never report the
-credential values, secret access key, session token, raw signature, or signed
-transaction bytes. Keep AWS errors out of the web process. A successful DryRun
-is an AWS access check only; it is not a Monad deployment or payment proof.
+For historical context, the prior OS Login attempt on 2026-10-08 was denied
+because the operator account lacked the administrator-granted
+`roles/compute.osLoginExternalUser` role on the external organization. That
+denial applied to the previous OS Login method and is not a current blocker for
+the authorized instance-level path.
+
+The protected install has been completed and the assumed-role identity and
+signer's configured DryRun passed through the protected signer path. The AWS
+account, assumed-role ARN, KMS key ID/ARN, and public chain addresses from that
+check are safe to report as status facts. Never report credential values,
+secret access keys, session tokens, raw signatures, or signed transaction
+bytes. Keep AWS errors out of the web process. A successful DryRun is an AWS
+access check only; it is not a Monad deployment or payment proof.
 
 ## Service start and checks
 
@@ -144,8 +194,10 @@ canonical Core evidence path; it must not trigger a second charge.
 For a new faucet deployment, an absent journal defaults to a plan-only/DryRun
 path and does not call RPC, sign, or broadcast. An existing journal may be
 checked through the read-only RPC reconciliation path; that reconciliation does
-not sign or rebroadcast anything. A separately reviewed deployment plan must
-provide concrete Monad creation and delivery evidence before either CREATE
-transaction or a real hosted purchase is described as complete. This runbook
-does not assert that either CREATE transaction, public funding, or a real
-hosted purchase has occurred.
+not sign or rebroadcast anything. The first CREATE listed above has only
+primary-RPC receipt evidence so far; dual-RPC finality is pending. The source
+fix for the finalized-head comparison bug passed the Monad 592 and Core 21
+regression gates; deploy the new release and reverify the original journal
+before accepting it. Nonce 4 and registration nonce 5 have not been
+broadcast, and no public funding, hosted purchase, or wallet acceptance is
+claimed here.
