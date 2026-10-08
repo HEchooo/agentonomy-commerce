@@ -34,6 +34,7 @@ def main(argv=None):
     parser.add_argument('--config', type=Path, required=True)
     parser.add_argument('--state-dir', type=Path, required=True)
     parser.add_argument('--origin', required=True)
+    parser.add_argument('--erc8004-config', type=Path)
     parser.add_argument('--port', type=int, default=8092)
     parser.add_argument('--validate-only', action='store_true')
     args = parser.parse_args(argv)
@@ -41,7 +42,16 @@ def main(argv=None):
         if not 1024 <= args.port <= 65535:
             raise ValueError('port out of range')
         configuration = load_configuration(args.config)
-        service = HostedCommerceService(args.state_dir, configuration, public_origin=args.origin)
+        registry = None
+        if args.erc8004_config:
+            from agentonomy_commerce.erc8004 import ERC8004Client, RegistryConfig
+            from examples.monad_commerce.public_worker import validate_bootstrap
+            network = validate_bootstrap(configuration).network
+            pins = RegistryConfig.from_dict(load_configuration(args.erc8004_config),
+                                            network=network, origin=args.origin)
+            registry = ERC8004Client(network, pins)
+        service = HostedCommerceService(args.state_dir, configuration, public_origin=args.origin,
+                                        registry=registry)
         app = create_app(origin=args.origin, runtime_factory=lambda: service)
         if args.validate_only:
             print(json.dumps({'status': 'configuration_valid', 'chain_id': 10143,

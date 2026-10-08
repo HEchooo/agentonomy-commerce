@@ -51,7 +51,8 @@ def test_validate_only_does_not_enter_service_or_start_listener(tmp_path: Path, 
     events: list[object] = []
 
     class FakeService:
-        def __init__(self, state_dir, configuration, *, public_origin):
+        def __init__(self, state_dir, configuration, *, public_origin, registry=None):
+            assert registry is None
             events.append(("construct", state_dir, configuration, public_origin))
 
         def __enter__(self):

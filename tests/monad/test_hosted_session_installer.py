@@ -276,6 +276,11 @@ def test_main_is_root_and_hostname_gated_and_prints_no_credentials(
         return directory
     monkeypatch.setattr(installer, "_new_backup_directory", test_backup_directory)
     monkeypatch.setattr(installer.sys, "stdin", SimpleNamespace(buffer=io.BytesIO(session_document())))
+    class FixedDateTime(datetime):
+        @classmethod
+        def now(cls, tz=None):
+            return NOW
+    monkeypatch.setattr(installer, "datetime", FixedDateTime)
 
     assert installer.main() == 0
     captured = capsys.readouterr()

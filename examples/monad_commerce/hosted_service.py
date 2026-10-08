@@ -33,11 +33,13 @@ _BROWSER_OPERATIONS = {
     'approval_transaction', 'verify_approval', 'claim_transaction', 'verify_claim',
     'opc_prepare', 'opc_approve', 'purchase', 'recover_purchase',
     'revoke_prepare', 'verify_revocation',
+    'agent_identity', 'feedback_prepare', 'feedback_verify', 'feedback_status',
 }
 _MUTATIONS = {
     'grant_challenge', 'grant_verify', 'budget_payload', 'budget_bind',
     'verify_approval', 'verify_claim', 'opc_prepare', 'opc_approve',
     'preview', 'execute', 'recover_purchase', 'revoke_prepare', 'verify_revocation',
+    'feedback_prepare', 'feedback_verify',
 }
 _MCP_AUTH_FIELDS = (
     'issuer', 'user_id', 'agent_id', 'scope', 'wallet_identity_id',
@@ -66,7 +68,7 @@ class HostedCommerceService:
     max_open_tenants = 4
 
     def __init__(self, state_dir, configuration, *, public_origin,
-                 canary_factory=HostedCanary, clock=time.time):
+                 canary_factory=HostedCanary, clock=time.time, registry=None):
         from shared.opc_protocol import canonical_opc_origin
         if canonical_opc_origin(public_origin) != public_origin:
             raise ValueError('canonical public HTTPS origin required')
@@ -76,6 +78,9 @@ class HostedCommerceService:
         # authority as the HTTPS site, never the legacy localhost default.
         self.configuration['deployment']['domain'] = public_origin.removeprefix('https://')
         self.public_origin, self.clock = public_origin, clock
+        if registry is not None and (registry.network != self.scope.network or registry.origin != public_origin):
+            raise ValueError('registry must match fixed commerce network and origin')
+        self.registry, self.feedback = registry, None
         self.state_dir = Path(state_dir)
         self.canary_factory = canary_factory
         self._cache = OrderedDict()
@@ -110,6 +115,9 @@ class HostedCommerceService:
                 );
             """)
             self.db.commit()
+            if self.registry is not None:
+                from examples.monad_commerce.hosted_feedback import FeedbackStore
+                self.feedback = FeedbackStore(self.db, self.registry, clock=self.clock)
             self.gate = RelayerGate(self.state_dir / 'relayer', self.scope.network,
                                     self.scope.relayer_address)
             _private_directory(self.state_dir / 'tenants')
@@ -127,6 +135,7 @@ class HostedCommerceService:
                 canary.__exit__(None, None, None)
             self._cache.clear()
             if self.db:
+                self.feedback = None
                 self.db.close()
                 self.db = None
             if self._state_lock:
@@ -389,6 +398,69 @@ class HostedCommerceService:
             raise PermissionError('Agent authorization changed')
         return identity
 
+    def registration_document(self):
+        if self.registry is None:
+            raise ValueError('ERC-8004 registry not configured')
+        return self.registry.registration_document()
+
+    def public_feedback(self, digest):
+        with self._lock:
+            return None if self.feedback is None else self.feedback.public(digest)
+
+    def _service_identity(self):
+        if self.registry is None:
+            return {'status': 'not_configured', 'verified': False}
+        identity = self.registry.verify_identity()
+        if identity is None:
+            return {'status': 'registration_pending', 'verified': False}
+        return identity | {
+            'reputation_registry': self.registry.config.reputation_registry,
+        }
+
+    def _identity_guard(self, canary, operation, args):
+        if self.registry is None:
+            return
+        identity = self._service_identity()
+        if (identity.get('verified') is not True
+            or identity.get('agent_wallet') != self.scope.network.payee):
+            raise ValueError('verified service receiver required')
+        if operation in {'execute', 'recover_purchase'}:
+            canary._start_market()
+            if operation == 'execute':
+                preview_id = args['preview_id']
+            else:
+                preview_id = canary.request('purchase', {'purchase_id': args['purchase_id']})['preview_id']
+            preview = canary.market.request('preview_state', {'preview_id': preview_id})
+            payment = preview.get('payment') or {}
+            if (preview.get('preview_id') != preview_id
+                or payment.get('pay_to') != identity['agent_wallet']
+                or payment.get('network') != self.scope.network.network
+                or payment.get('asset') != self.scope.network.token
+                or str(payment.get('amount_atomic')) != '300000'):
+                raise ValueError('frozen preview differs from verified service receiver')
+
+    def _feedback_operation(self, row, canary, operation, args):
+        if self.feedback is None:
+            raise ValueError('ERC-8004 feedback not configured')
+        purchase_id = args.get('purchase_id')
+        if (type(purchase_id) is not str
+            or re.fullmatch(r'purchase_[A-Za-z0-9][A-Za-z0-9_-]{0,159}', purchase_id) is None):
+            raise ValueError('canonical purchase ID required')
+        fields = {'purchase_id', 'score'} if operation == 'feedback_prepare' else (
+                 {'purchase_id', 'transaction_hash'} if operation == 'feedback_verify' else {'purchase_id'})
+        if set(args) != fields:
+            raise ValueError('feedback fields are outside scope')
+        scope = dict(tenant_id=row['tenant_id'], purchase_id=purchase_id, buyer=row['owner'])
+        if operation == 'feedback_status':
+            return self.feedback.status(**scope)
+        if operation == 'feedback_verify':
+            return self.feedback.verify(**scope, tx_hash=args['transaction_hash'])
+        purchase = canary.request('purchase', {'purchase_id': purchase_id})
+        if canary._verified_gate_proof(purchase, purchase_id) is None:
+            raise ValueError('Core-verified original payment required')
+        return self.feedback.prepare(**scope, score=args['score'], purchase=purchase,
+                                     identity=self._service_identity())
+
     def dispatch(self, browser_token, csrf_token, operation, args):
         with self._lock:
             if operation not in _BROWSER_OPERATIONS | _AGENT_OPERATIONS:
@@ -398,9 +470,17 @@ class HostedCommerceService:
                 if not admitted['authenticated']:
                     return admitted
             row, canary = self._authorize(browser_token, csrf_token, mutation=operation in _MUTATIONS)
+            if operation == 'agent_identity':
+                if args:
+                    raise ValueError('service identity is fixed by operator')
+                return self._service_identity()
+            if operation.startswith('feedback_'):
+                return self._feedback_operation(row, canary, operation, args)
             if operation == 'status':
                 return canary.status() | {'authenticated': True, 'opc': self._opc_status(row, canary)}
             if operation in _AGENT_OPERATIONS:
+                if operation in {'preview', 'execute'}:
+                    self._identity_guard(canary, operation, args)
                 return self._agent_operation(row, canary, operation, args)
             if operation == 'opc_prepare':
                 if args:
@@ -419,5 +499,9 @@ class HostedCommerceService:
             if operation in {'grant_verify', 'budget_payload', 'budget_bind'}:
                 return canary.onboarding(operation, **args)
             if operation in {'purchase', 'recover_purchase'}:
+                if operation == 'recover_purchase' and self.registry is not None:
+                    existing = canary.request('purchase', {'purchase_id': args['purchase_id']})
+                    if canary._verified_gate_proof(existing, args['purchase_id']) is None:
+                        self._identity_guard(canary, operation, args)
                 return public_purchase(canary.request(operation, args))
             return getattr(canary, operation)(**args)

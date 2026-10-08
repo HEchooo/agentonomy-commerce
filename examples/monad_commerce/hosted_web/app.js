@@ -11,15 +11,20 @@
   // 100,000; accept lower values but reject drift above that server ceiling.
   const MAX_TX_GAS = 100000n;
   const MAX_GAS_PRICE_WEI = 500000000000n;
+  const MAX_FEEDBACK_TX_GAS = 500000n;
   const EIP712_DOMAIN_NAME = "Agentonomy Budget Executor";
   const EIP712_DOMAIN_VERSION = "1";
   const APPROVE_SELECTOR = "095ea7b3";
   const REVOKE_SELECTOR = "b75c7dc6";
+  // giveFeedback(uint256,int128,uint8,string,string,string,string,bytes32)
+  // is the only Reputation Registry method exposed by the hosted feedback UI.
+  const FEEDBACK_SELECTOR = "3c036a7e";
   // claim() is the only supported faucet call.  Keep the selector pinned in
   // the browser as a second check against a server-side transaction drift.
   const CLAIM_SELECTOR = "4e71d92d";
   const EXPLORER_TX = "https://testnet.monadexplorer.com/tx/";
   const PURCHASE_REFS_STORAGE_KEY = "agentonomy.hosted.purchase_refs.v1";
+  const FEEDBACK_REFS_STORAGE_KEY = "agentonomy.hosted.feedback_refs.v1";
   const PREVIEW_ID_PATTERN = /^preview_([A-Za-z0-9][A-Za-z0-9_-]{0,159})$/;
   const PURCHASE_ID_PATTERN = /^purchase_[A-Za-z0-9][A-Za-z0-9_-]{0,159}$/;
   const IDEMPOTENCY_KEY_PATTERN = /^[\x21-\x7e]{1,256}$/;
@@ -70,6 +75,20 @@
     purchaseReferenceRestored: false,
     purchaseSettlement: null,
     purchaseServiceMode: null,
+    agentIdentity: null,
+    feedbackPurchaseId: null,
+    feedbackScore: null,
+    feedbackStatus: "unprepared",
+    feedbackHash: null,
+    feedbackUri: null,
+    feedbackTransaction: null,
+    feedbackDisclosure: null,
+    feedbackTxHash: null,
+    feedbackVerificationPending: false,
+    feedbackVerified: false,
+    feedbackIndex: null,
+    feedbackRevoked: false,
+    feedbackAwaitingRecovery: false,
     coreRevoked: false,
     revokePrepared: false,
     revokeTransaction: null,
@@ -269,13 +288,120 @@
     if (!state.authenticated) return;
     const owner = normalizeAddress(state.sessionOwner || state.status && state.status.owner);
     const reference = owner && readPurchaseReferences()[owner];
-    if (!reference) return;
-    state.previewId = reference.preview_id;
-    state.purchaseId = reference.purchase_id;
-    state.idempotencyKey = reference.idempotency_key;
+    const feedback = owner && readFeedbackReference(owner);
+    if (!reference && !feedback) return;
+    state.previewId = reference ? reference.preview_id : null;
+    state.purchaseId = reference ? reference.purchase_id : feedback.purchase_id;
+    state.idempotencyKey = reference ? reference.idempotency_key : null;
+    restoreFeedbackReference(state.purchaseId);
     state.purchaseReferenceRestored = true;
     const purchaseInput = $("purchase-id");
-    if (purchaseInput) purchaseInput.value = reference.purchase_id;
+    if (purchaseInput) purchaseInput.value = state.purchaseId;
+  }
+
+  function safeFeedbackReference(value) {
+    if (!value || typeof value !== "object" || !PURCHASE_ID_PATTERN.test(value.purchase_id)
+        || !hash(value.feedback_hash) || !Number.isInteger(value.score) || value.score < 0 || value.score > 100
+        || typeof value.send_unknown !== "boolean") return null;
+    if (value.transaction_hash !== null && !hash(value.transaction_hash)) return null;
+    return {purchase_id: value.purchase_id, feedback_hash: hash(value.feedback_hash), score: value.score,
+      transaction_hash: hash(value.transaction_hash), send_unknown: value.send_unknown};
+  }
+
+  function readFeedbackReferences() {
+    const books = {};
+    try {
+      const storage = purchaseStorage();
+      const raw = storage && JSON.parse(storage.getItem(FEEDBACK_REFS_STORAGE_KEY) || "{}");
+      if (!raw || typeof raw !== "object" || Array.isArray(raw)) return books;
+      for (const [owner, book] of Object.entries(raw).slice(-64)) {
+        if (!normalizeAddress(owner) || !book || typeof book !== "object" || !book.orders) continue;
+        const orders = {};
+        for (const [id, value] of Object.entries(book.orders).slice(-64)) {
+          const reference = safeFeedbackReference(value);
+          if (reference && reference.purchase_id === id) orders[id] = reference;
+        }
+        books[normalizeAddress(owner)] = {last: book.last, orders};
+      }
+    } catch (_) { /* Untrusted or unavailable browser storage is not authority. */ }
+    return books;
+  }
+
+  function readFeedbackReference(owner, purchaseId = null) {
+    const book = readFeedbackReferences()[normalizeAddress(owner)];
+    const id = purchaseId || book && book.last;
+    const reference = book && book.orders[id] || null;
+    let attempt = null;
+    try {
+      const storage = purchaseStorage();
+      attempt = id && storage && safeFeedbackReference(JSON.parse(
+        storage.getItem(`${FEEDBACK_REFS_STORAGE_KEY}.attempt.${normalizeAddress(owner)}.${id}`) || "null"));
+    } catch (_) { /* Sending separately requires readable, durable storage. */ }
+    if (!attempt || attempt.purchase_id !== id) return reference;
+    if (!reference) return attempt;
+    if (reference.feedback_hash !== attempt.feedback_hash || reference.score !== attempt.score
+        || reference.transaction_hash && attempt.transaction_hash
+          && reference.transaction_hash !== attempt.transaction_hash) {
+      throw new Error("conflicting feedback recovery references");
+    }
+    // A server-observed candidate must survive an older null attempt marker.
+    return {...reference, transaction_hash: attempt.transaction_hash || reference.transaction_hash,
+      send_unknown: attempt.send_unknown || reference.send_unknown};
+  }
+
+  function persistFeedbackReference(value = null, {attempt = false, cancelled = false} = {}) {
+    const owner = normalizeAddress(value ? value.owner : currentOwner());
+    const reference = safeFeedbackReference(value || {purchase_id: state.feedbackPurchaseId,
+      feedback_hash: state.feedbackHash, score: state.feedbackScore,
+      transaction_hash: state.feedbackTxHash, send_unknown: state.feedbackAwaitingRecovery});
+    const storage = purchaseStorage();
+    if (!owner || !reference || !storage) return false;
+    try {
+      const books = readFeedbackReferences();
+      const book = books[owner] || {orders: {}};
+      const previous = readFeedbackReference(owner, reference.purchase_id);
+      if (previous && (previous.feedback_hash !== reference.feedback_hash || previous.score !== reference.score
+          || previous.transaction_hash && previous.transaction_hash !== reference.transaction_hash)) return false;
+      if (previous && previous.send_unknown && !reference.transaction_hash && !cancelled) reference.send_unknown = true;
+      // Only the originating wallet attempt changes this separate marker.
+      // Ordinary book writes in another tab cannot erase a pending send.
+      if (attempt) {
+        const key = `${FEEDBACK_REFS_STORAGE_KEY}.attempt.${owner}.${reference.purchase_id}`;
+        const marker = JSON.stringify(reference);
+        storage.setItem(key, marker);
+        if (storage.getItem(key) !== marker) return false;
+      }
+      book.orders[reference.purchase_id] = reference;
+      book.last = reference.purchase_id;
+      books[owner] = book;
+      const serialized = JSON.stringify(books);
+      storage.setItem(FEEDBACK_REFS_STORAGE_KEY, serialized);
+      return storage.getItem(FEEDBACK_REFS_STORAGE_KEY) === serialized;
+    } catch (_) { return false; }
+  }
+
+  function clearFeedbackState(purchaseId = null) {
+    Object.assign(state, {feedbackPurchaseId: purchaseId, feedbackScore: null, feedbackHash: null,
+      feedbackUri: null, feedbackTransaction: null, feedbackDisclosure: null, feedbackTxHash: null,
+      feedbackStatus: "unprepared", feedbackVerificationPending: false, feedbackVerified: false,
+      feedbackIndex: null, feedbackRevoked: false, feedbackAwaitingRecovery: false});
+    const input = $("feedback-tx-hash");
+    if (input) input.value = "";
+  }
+
+  function restoreFeedbackReference(purchaseId) {
+    clearFeedbackState(purchaseId);
+    const reference = readFeedbackReference(currentOwner(), purchaseId);
+    if (!reference) return;
+    state.feedbackHash = reference.feedback_hash;
+    state.feedbackUri = feedbackUriForHash(reference.feedback_hash);
+    state.feedbackScore = reference.score;
+    state.feedbackTxHash = reference.transaction_hash;
+    state.feedbackAwaitingRecovery = reference.send_unknown || !!reference.transaction_hash;
+    state.feedbackVerificationPending = !!reference.transaction_hash;
+    state.feedbackStatus = reference.transaction_hash ? "pending" : "prepared";
+    const input = $("feedback-score");
+    if (input) input.value = String(reference.score);
   }
 
   function friendlyError(error) {
@@ -393,6 +519,20 @@
     state.purchaseReferenceRestored = false;
     state.purchaseSettlement = null;
     state.purchaseServiceMode = null;
+    state.agentIdentity = null;
+    state.feedbackPurchaseId = null;
+    state.feedbackScore = null;
+    state.feedbackStatus = "unprepared";
+    state.feedbackHash = null;
+    state.feedbackUri = null;
+    state.feedbackTransaction = null;
+    state.feedbackDisclosure = null;
+    state.feedbackTxHash = null;
+    state.feedbackVerificationPending = false;
+    state.feedbackVerified = false;
+    state.feedbackIndex = null;
+    state.feedbackRevoked = false;
+    state.feedbackAwaitingRecovery = false;
     state.coreRevoked = false;
     state.revokePrepared = false;
     state.revokeTransaction = null;
@@ -404,15 +544,18 @@
       state.account = null;
       state.chainId = null;
     }
-    for (const id of ["phase", "owner", "chain", "mode", "token", "executor", "payee", "balance", "terms"]) {
+    for (const id of ["phase", "owner", "chain", "mode", "token", "executor", "payee", "balance", "terms",
+      "agent-identity-status", "agent-id", "agent-registry", "agent-owner", "agent-wallet", "agent-uri",
+      "reputation-registry", "feedback-status"]) {
       text(id, "—");
     }
     text("commerce", "暂无订单快照");
     text("purchase-status", "尚未创建订单");
     text("result", "请查询／恢复当前订单。");
+    renderFeedbackDisclosure();
     const txLinks = $("tx-links");
     if (txLinks && typeof txLinks.replaceChildren === "function") txLinks.replaceChildren();
-    for (const id of ["allowance-hash", "claim-hash", "purchase-id", "revoke-hash"]) {
+    for (const id of ["allowance-hash", "claim-hash", "purchase-id", "revoke-hash", "feedback-tx-hash"]) {
       const node = $(id);
       if (node) node.value = "";
     }
@@ -1040,6 +1183,167 @@
     return BigInt(value);
   }
 
+  function feedbackScoreValue(value, name = "feedback score") {
+    if (typeof value === "number") {
+      if (!Number.isSafeInteger(value) || value < 0 || value > 100) throw new Error(`${name} invalid`);
+      return value;
+    }
+    if (typeof value !== "string" || !/^(?:0|[1-9][0-9]*)$/.test(value)) {
+      throw new Error(`${name} invalid`);
+    }
+    const score = Number(value);
+    if (!Number.isSafeInteger(score) || score < 0 || score > 100) throw new Error(`${name} invalid`);
+    return score;
+  }
+
+  function registryAddress(value, name = "registry") {
+    if (typeof value !== "string") throw new Error(`${name} invalid`);
+    const caip = new RegExp(`^eip155:${CHAIN_ID}:(0x[0-9a-fA-F]{40})$`).exec(value);
+    if (caip) return caip[1].toLowerCase();
+    const direct = normalizeAddress(value);
+    if (direct) return direct;
+    throw new Error(`${name} invalid`);
+  }
+
+  function feedbackOrigin() {
+    const locationValue = typeof globalThis !== "undefined" && globalThis.location
+      ? globalThis.location
+      : typeof window !== "undefined" && window.location ? window.location : null;
+    const origin = locationValue && typeof locationValue.origin === "string"
+      ? locationValue.origin.replace(/\/+$/, "") : null;
+    if (!origin || !/^https?:\/\/[^/]+$/i.test(origin)) throw new Error("feedback origin invalid");
+    return origin;
+  }
+
+  function feedbackUriForHash(feedbackHash) {
+    return `${feedbackOrigin()}/erc8004/feedback/${feedbackHash.slice(2)}.json`;
+  }
+
+  function abiWord(value, name) {
+    let number;
+    try {
+      number = typeof value === "bigint" ? value : uintValue(value, name);
+    } catch (_) {
+      throw new Error(`${name} invalid`);
+    }
+    if (number < 0n || number >= (1n << 256n)) throw new Error(`${name} invalid`);
+    return number.toString(16).padStart(64, "0");
+  }
+
+  function abiString(value, name) {
+    if (typeof value !== "string") throw new Error(`${name} invalid`);
+    const encoded = utf8Hex(value).slice(2);
+    const length = encoded.length / 2;
+    const paddedLength = Math.ceil(encoded.length / 64) * 64;
+    return `${abiWord(length, `${name} length`)}${encoded.padEnd(paddedLength, "0")}`;
+  }
+
+  function feedbackCalldata(agentId, score, feedbackHash, feedbackUri) {
+    const normalizedHash = bytes32(feedbackHash, "feedback hash");
+    const normalizedScore = feedbackScoreValue(score);
+    const origin = feedbackOrigin();
+    const strings = ["starred", "csv-reconciliation", `${origin}/`, feedbackUri];
+    const encodedStrings = strings.map((value, index) => abiString(value, `feedback string ${index}`));
+    const baseOffset = 32 * 8;
+    const offsets = [];
+    let offset = baseOffset;
+    for (const encoded of encodedStrings) {
+      offsets.push(abiWord(offset, "feedback offset"));
+      offset += encoded.length / 2;
+    }
+    return `0x${FEEDBACK_SELECTOR}${abiWord(agentId, "agent id")}${abiWord(normalizedScore, "feedback score")}`
+      + `${abiWord(0, "feedback decimals")}${offsets.join("")}${normalizedHash.slice(2)}${encodedStrings.join("")}`;
+  }
+
+  function validateAgentIdentity(payload) {
+    if (!payload || typeof payload !== "object") throw new Error("agent identity invalid");
+    if (payload.status === "not_configured" || payload.verified === false) {
+      return {status: payload.status === "registration_pending" ? "registration_pending" : "not_configured", verified: false};
+    }
+    if (payload.verified !== true) throw new Error("agent identity unverified");
+    const agentId = uintValue(field(payload, "agent_id", "agentId"), "agent id");
+    if (agentId >= (1n << 256n)) throw new Error("agent id invalid");
+    const identityRegistry = field(payload, "agent_registry", "agentRegistry");
+    const identityAddress = registryAddress(identityRegistry, "agent registry");
+    const owner = normalizeAddress(field(payload, "agent_owner", "agentOwner"));
+    const wallet = normalizeAddress(field(payload, "agent_wallet", "agentWallet"));
+    const chainId = parseChainId(field(payload, "chain_id", "chainId"));
+    const blockNumber = uintValue(field(payload, "block_number", "blockNumber"), "agent block number");
+    const blockHash = bytes32(field(payload, "block_hash", "blockHash"), "agent block hash");
+    const reputation = registryAddress(
+      field(payload, "reputation_registry", "reputationRegistry"),
+      "reputation registry",
+    );
+    if (!owner || !wallet || chainId !== CHAIN_ID || !identityAddress || !blockHash) {
+      throw new Error("agent identity fields invalid");
+    }
+    const expectedUri = `${feedbackOrigin()}/agent.json`;
+    if (field(payload, "agent_uri", "agentUri") !== expectedUri) throw new Error("agent URI invalid");
+    const expectedPayee = normalizeAddress(state.status && state.status.payee);
+    if (expectedPayee && wallet !== expectedPayee) throw new Error("agent wallet invalid");
+    return {
+      verified: true,
+      status: "verified",
+      agent_id: agentId.toString(10),
+      agent_registry: `eip155:${CHAIN_ID}:${identityAddress}`,
+      agent_owner: owner,
+      agent_wallet: wallet,
+      agent_uri: expectedUri,
+      chain_id: CHAIN_ID,
+      block_number: blockNumber.toString(10),
+      block_hash: blockHash,
+      reputation_registry: reputation,
+    };
+  }
+
+  function validateFeedbackTransaction(payload, expected = {}) {
+    const transaction = payload && payload.transaction;
+    if (!transaction || typeof transaction !== "object" || Array.isArray(transaction)) {
+      throw new Error("feedback transaction invalid");
+    }
+    const allowedKeys = ["from", "to", "value", "data", "chainId", "gas", "gasPrice"];
+    if (Object.keys(transaction).some((key) => !allowedKeys.includes(key))
+        || !["from", "to", "value", "data", "chainId", "gas"].every((key) => key in transaction)) {
+      throw new Error("feedback transaction schema invalid");
+    }
+    const identity = expected.identity || state.agentIdentity;
+    if (!identity || identity.verified !== true) throw new Error("agent identity required");
+    const expectedOwner = normalizeAddress(expected.owner || currentOwner());
+    const expectedReputation = registryAddress(
+      field(identity, "reputation_registry", "reputationRegistry")
+        || field(expected, "reputation_registry", "reputationRegistry"),
+      "reputation registry",
+    );
+    if (!expectedOwner || !expectedReputation) throw new Error("feedback configuration invalid");
+    const feedbackHash = bytes32(field(payload, "feedback_hash", "feedbackHash"), "feedback hash");
+    const feedbackUri = field(payload, "feedback_uri", "feedbackUri");
+    const expectedUri = feedbackUriForHash(feedbackHash);
+    if (typeof feedbackUri !== "string" || feedbackUri !== expectedUri) throw new Error("feedback URI invalid");
+    const score = feedbackScoreValue(field(payload, "score"));
+    if (normalizeAddress(transaction.from) !== expectedOwner) throw new Error("feedback owner invalid");
+    if (normalizeAddress(transaction.to) !== expectedReputation) throw new Error("feedback target invalid");
+    if (parseChainId(transaction.chainId) !== CHAIN_ID) throw new Error("feedback chain invalid");
+    if (typeof transaction.value !== "string" || transaction.value.toLowerCase() !== "0x0") {
+      throw new Error("feedback value invalid");
+    }
+    const data = feedbackCalldata(identity.agent_id, score, feedbackHash, feedbackUri);
+    if (typeof transaction.data !== "string" || transaction.data.toLowerCase() !== data) {
+      throw new Error("feedback data invalid");
+    }
+    const normalized = {
+      from: expectedOwner,
+      to: expectedReputation,
+      value: "0x0",
+      data,
+      chainId: CHAIN_HEX,
+      gas: boundedQuantity(transaction.gas, "gas", MAX_FEEDBACK_TX_GAS),
+    };
+    if (transaction.gasPrice !== undefined) {
+      normalized.gasPrice = boundedQuantity(transaction.gasPrice, "gasPrice", MAX_GAS_PRICE_WEI);
+    }
+    return normalized;
+  }
+
   function sameTypedSchema(actual, expected, name) {
     if (!Array.isArray(actual) || actual.length !== expected.length) throw new Error(`${name} invalid`);
     for (let index = 0; index < expected.length; index += 1) {
@@ -1334,6 +1638,7 @@
   function updatePurchase(result, context = null) {
     if (context) assertOperationCurrent(context);
     state.purchaseId = result && (result.purchase_id || result.id) || state.purchaseId;
+    if (state.feedbackPurchaseId !== state.purchaseId) restoreFeedbackReference(state.purchaseId);
     if (result && typeof result.preview_id === "string" && result.preview_id) state.previewId = result.preview_id;
     state.purchaseReferenceRestored = false;
     state.purchaseState = result && (result.state || result.status) || null;
@@ -1350,6 +1655,247 @@
     const resultNode = $("result");
     if (resultNode) resultNode.textContent = output ? JSON.stringify(output, null, 2) : "请查询／恢复当前订单。";
     return result;
+  }
+
+  function feedbackPurchaseId() {
+    const input = $("purchase-id");
+    const purchaseId = input && input.value ? input.value.trim() : state.purchaseId;
+    if (typeof purchaseId !== "string" || !PURCHASE_ID_PATTERN.test(purchaseId)) {
+      throw new Error("purchase required");
+    }
+    return purchaseId;
+  }
+
+  function feedbackPurchaseReady() {
+    authenticatedOwner();
+    if (!state.agentIdentity || state.agentIdentity.verified !== true) throw new Error("verified agent identity required");
+    const purchaseId = feedbackPurchaseId();
+    if (purchaseId !== state.purchaseId || state.purchaseState !== "delivered" || !state.purchaseSettlement) {
+      throw new Error("query the verified delivered purchase first");
+    }
+    return purchaseId;
+  }
+
+  function feedbackDisclosure(value) {
+    if (!value || normalizeAddress(value.buyer) !== currentOwner()
+        || !hash(value.payment_transaction_hash)
+        || typeof value.output_hash !== "string" || !/^sha256:[0-9a-f]{64}$/.test(value.output_hash)) {
+      throw new Error("feedback disclosure invalid");
+    }
+    return {buyer: normalizeAddress(value.buyer), score: feedbackScoreValue(value.score),
+      payment_transaction_hash: hash(value.payment_transaction_hash), output_hash: value.output_hash};
+  }
+
+  function renderFeedbackDisclosure() {
+    const node = $("feedback-disclosure");
+    if (node) node.textContent = state.feedbackDisclosure
+      ? JSON.stringify(state.feedbackDisclosure, null, 2) : "先准备并查看公开内容，再明确发送。";
+  }
+
+  function applyFeedbackStatus(result, context = null) {
+    if (context) assertOperationCurrent(context);
+    if (!result || !["unprepared", "prepared", "pending", "verified"].includes(result.status)) {
+      throw new Error("feedback status invalid");
+    }
+    const digest = result.feedback_hash == null ? null : bytes32(result.feedback_hash, "feedback hash");
+    if (digest && state.feedbackHash && digest !== state.feedbackHash) throw new Error("feedback hash mismatch");
+    const txHash = result.transaction_hash == null ? null : hash(result.transaction_hash);
+    if (result.transaction_hash != null && !txHash) throw new Error("feedback transaction hash invalid");
+    if (txHash && state.feedbackTxHash && txHash !== state.feedbackTxHash) throw new Error("feedback transaction hash mismatch");
+    if (digest) state.feedbackHash = digest;
+    if (result.score !== undefined) {
+      const score = feedbackScoreValue(result.score);
+      if (state.feedbackScore !== null && score !== state.feedbackScore) throw new Error("frozen feedback score mismatch");
+      state.feedbackScore = score;
+    }
+    if (state.feedbackHash) state.feedbackUri = feedbackUriForHash(state.feedbackHash);
+    if (result.feedback_uri !== undefined && result.feedback_uri !== state.feedbackUri) throw new Error("feedback URI invalid");
+    if (txHash) state.feedbackTxHash = txHash;
+    if (result.status === "verified") {
+      if (result.verified !== true || !state.feedbackTxHash || !Number.isSafeInteger(result.feedback_index)
+          || result.feedback_index < 1 || typeof result.is_revoked !== "boolean") throw new Error("feedback proof invalid");
+      state.feedbackVerified = true;
+      state.feedbackIndex = result.feedback_index;
+      state.feedbackRevoked = result.is_revoked;
+      state.feedbackAwaitingRecovery = false;
+    } else state.feedbackVerified = false;
+    state.feedbackStatus = result.status;
+    state.feedbackVerificationPending = !!state.feedbackTxHash && !state.feedbackVerified;
+    if (txHash) state.feedbackAwaitingRecovery = false;
+    persistFeedbackReference();
+    renderFeedbackDisclosure();
+    return result;
+  }
+
+  async function refreshAgentIdentity() {
+    return run(async (operation) => {
+      await ensureAuthenticatedWallet({}, operation);
+      const result = await request("/api/agent", "GET", undefined, operation);
+      assertOperationCurrent(operation);
+      state.agentIdentity = validateAgentIdentity(result);
+      render();
+      setMessage(state.agentIdentity.verified ? "ERC-8004 服务身份已独立复验。" : "ERC-8004 服务身份尚不可用。");
+      return result;
+    });
+  }
+
+  async function prepareFeedback() {
+    return run(async (operation) => {
+      const purchaseId = feedbackPurchaseReady();
+      if (state.feedbackTxHash || state.feedbackAwaitingRecovery) {
+        setMessage("请恢复原反馈交易；不会重新准备或发送。"); return null;
+      }
+      const scoreNode = $("feedback-score");
+      const score = feedbackScoreValue(scoreNode && scoreNode.value);
+      const result = await request(`/api/purchases/${encodeURIComponent(purchaseId)}/feedback/prepare`, "POST", {score}, operation);
+      assertOperationCurrent(operation);
+      if (feedbackPurchaseId() !== purchaseId || state.purchaseId !== purchaseId) throw new Error("purchase changed");
+      state.feedbackPurchaseId = purchaseId;
+      if (result.status !== "prepared") { applyFeedbackStatus(result, operation); return null; }
+      const transaction = validateFeedbackTransaction(result, {owner: authenticatedOwner(), identity: state.agentIdentity});
+      const disclosure = feedbackDisclosure(result.disclosure);
+      if (result.score !== score || disclosure.score !== score
+          || disclosure.payment_transaction_hash !== state.purchaseSettlement.transaction_hash) throw new Error("feedback disclosure mismatch");
+      state.feedbackTransaction = transaction;
+      state.feedbackDisclosure = disclosure;
+      applyFeedbackStatus(result, operation);
+      setMessage("请查看公开的买方地址、分数、付款交易和结果摘要，再点击发送反馈。");
+      render();
+      return transaction;
+    });
+  }
+
+  function feedbackDraftMatches(purchaseId) {
+    const input = $("feedback-score");
+    return state.feedbackPurchaseId === purchaseId && state.purchaseId === purchaseId
+      && feedbackPurchaseId() === purchaseId && state.feedbackTransaction && state.feedbackDisclosure
+      && feedbackScoreValue(input && input.value) === state.feedbackScore;
+  }
+
+  async function submitFeedback() {
+    return run(async (operation) => {
+      const purchaseId = feedbackPurchaseReady();
+      if (state.feedbackTxHash || state.feedbackAwaitingRecovery) {
+        setMessage("请复验原交易；不会再次发送。"); return null;
+      }
+      if (!feedbackDraftMatches(purchaseId)) { setMessage("请先准备并核对这个订单的反馈草稿。"); return null; }
+      const transaction = validateFeedbackTransaction({transaction: state.feedbackTransaction,
+        score: state.feedbackScore, feedback_hash: state.feedbackHash, feedback_uri: state.feedbackUri},
+        {owner: authenticatedOwner(), identity: state.agentIdentity});
+      const owner = authenticatedOwner();
+      const locks = typeof navigator !== "undefined" && navigator.locks;
+      if (!locks || typeof locks.request !== "function") {
+        throw new Error("cross-tab feedback lock required");
+      }
+      return locks.request(`agentonomy.feedback.${CHAIN_ID}.${owner}.${purchaseId}`,
+        {mode: "exclusive", ifAvailable: true}, async (lock) => {
+          assertOperationCurrent(operation);
+          if (!lock) { setMessage("另一个页面正在发送这个订单的反馈，请查看原交易。"); return null; }
+          const previous = readFeedbackReference(owner, purchaseId);
+          if (previous && (previous.transaction_hash || previous.send_unknown)) {
+            restoreFeedbackReference(purchaseId);
+            setMessage("已有反馈发送记录，请复验原交易；不会再次发送。"); return null;
+          }
+          await ensureAuthenticatedWallet({}, operation);
+          if (!feedbackDraftMatches(purchaseId)) throw new Error("feedback draft changed");
+          const reference = {owner, purchase_id: purchaseId,
+            feedback_hash: state.feedbackHash, score: state.feedbackScore, transaction_hash: null, send_unknown: true};
+          // Persist to the captured wallet/order BEFORE the wallet may send. A late
+          // response must never turn another account's draft into a resend path.
+          if (!persistFeedbackReference(reference, {attempt: true})) throw new Error("durable feedback recovery storage required");
+          state.feedbackAwaitingRecovery = true;
+          render();
+          let sent;
+          try { sent = await providerRequest("eth_sendTransaction", [transaction], operation); }
+          catch (error) {
+            if (error && error.stale || !operationIsCurrent(operation)) throw staleOperationError();
+            if (error && error.code === 4001) {
+              reference.send_unknown = false;
+              if (persistFeedbackReference(reference, {attempt: true, cancelled: true})) state.feedbackAwaitingRecovery = false;
+              throw error;
+            }
+            setMessage("发送结果未知，请从钱包查找原交易哈希并复验；不会重发。"); return null;
+          }
+          const txHash = hash(sent);
+          if (!txHash) { setMessage("发送结果未知，请补入原交易哈希；不会重发。"); return null; }
+          reference.transaction_hash = txHash;
+          reference.send_unknown = false;
+          if (!persistFeedbackReference(reference, {attempt: true})) {
+            // The pre-send lock remains durable even if saving the returned hash
+            // fails. Keep the hash visible for manual recovery.
+            state.feedbackTxHash = txHash;
+            setMessage("已发送，请保存原交易哈希后复验。"); return null;
+          }
+          assertOperationCurrent(operation);
+          state.feedbackTxHash = txHash;
+          state.feedbackStatus = "pending";
+          state.feedbackVerificationPending = true;
+          state.feedbackAwaitingRecovery = false;
+          const input = $("feedback-tx-hash");
+          if (input) input.value = txHash;
+          render();
+          const result = await request(`/api/purchases/${encodeURIComponent(purchaseId)}/feedback/verify`,
+            "POST", {transaction_hash: txHash}, operation);
+          applyFeedbackStatus(result, operation);
+          setMessage(state.feedbackVerified ? "反馈已独立复验。" : "请复验同一交易，不会再次发送。");
+          return result;
+      });
+    });
+  }
+
+  async function queryFeedback() {
+    return run(async (operation) => {
+      authenticatedOwner();
+      const purchaseId = feedbackPurchaseId();
+      if (purchaseId !== state.purchaseId) throw new Error("query the original purchase first");
+      if (state.feedbackPurchaseId !== purchaseId) restoreFeedbackReference(purchaseId);
+      const result = await request(`/api/purchases/${encodeURIComponent(purchaseId)}/feedback`, "GET", undefined, operation);
+      if (feedbackPurchaseId() !== purchaseId) throw new Error("purchase changed");
+      applyFeedbackStatus(result, operation);
+      setMessage("已查询反馈状态；不会发送交易。"); return result;
+    });
+  }
+
+  async function verifyFeedbackAction(hashValue = null, context = null) {
+    const operation = operationContext(context);
+    assertOperationCurrent(operation);
+    authenticatedOwner();
+    const purchaseId = feedbackPurchaseId();
+    if (purchaseId !== state.purchaseId || purchaseId !== state.feedbackPurchaseId || !state.feedbackHash) {
+      throw new Error("query the original feedback purchase first");
+    }
+    const input = $("feedback-tx-hash");
+    const entered = hash(hashValue || input && input.value || state.feedbackTxHash);
+    if (!entered || state.feedbackTxHash && state.feedbackTxHash !== entered) throw new Error("original feedback transaction required");
+    const owner = authenticatedOwner();
+    const locks = typeof navigator !== "undefined" && navigator.locks;
+    if (!locks || typeof locks.request !== "function") throw new Error("cross-tab feedback lock required");
+    return locks.request(`agentonomy.feedback.${CHAIN_ID}.${owner}.${purchaseId}`,
+      {mode: "exclusive", ifAvailable: true}, async (lock) => {
+        assertOperationCurrent(operation);
+        if (!lock) { setMessage("另一个页面正在处理原反馈，请稍后复验。"); return null; }
+        if (feedbackPurchaseId() !== purchaseId) throw new Error("purchase changed");
+        const previous = readFeedbackReference(owner, purchaseId);
+        if (previous && previous.transaction_hash && previous.transaction_hash !== entered) {
+          throw new Error("original feedback transaction required");
+        }
+        state.feedbackTxHash = entered;
+        state.feedbackAwaitingRecovery = true;
+        state.feedbackVerificationPending = true;
+        state.feedbackStatus = "pending";
+        if (!persistFeedbackReference(null, {attempt: true})) throw new Error("durable feedback recovery storage required");
+        if (input) input.value = entered;
+        const result = await request(`/api/purchases/${encodeURIComponent(purchaseId)}/feedback/verify`,
+          "POST", {transaction_hash: entered}, operation);
+        applyFeedbackStatus(result, operation);
+        addTxLink("tx-links", entered);
+        setMessage(state.feedbackVerified ? "反馈已独立复验。" : "请复验同一交易，不会再次发送。");
+        return result;
+    });
+  }
+
+  async function verifyFeedback(hashValue = null) {
+    return run((operation) => verifyFeedbackAction(hashValue, operation));
   }
 
   async function executePurchase() {
@@ -1598,6 +2144,29 @@
     text("wallet-address", state.account || "未连接");
     text("wallet-chain", state.chainId || "未连接");
     text("authenticated", state.authenticated ? "已登录" : "未登录");
+    const identity = state.agentIdentity;
+    text("agent-identity-status", !identity
+      ? "尚未读取"
+      : identity.verified ? "已复验" : identity.status === "registration_pending" ? "等待注册" : "未配置");
+    text("agent-id", identity && identity.verified ? identity.agent_id : "—");
+    text("agent-registry", identity && identity.verified ? identity.agent_registry : "—");
+    text("agent-owner", identity && identity.verified ? identity.agent_owner : "—");
+    text("agent-wallet", identity && identity.verified ? identity.agent_wallet : "—");
+    text("agent-uri", identity && identity.verified ? identity.agent_uri : "—");
+    text("reputation-registry", identity && identity.verified ? identity.reputation_registry : "—");
+    const feedbackStatusText = state.feedbackRevoked && state.feedbackVerified
+      ? "已复验（已撤销）"
+      : state.feedbackVerified
+        ? "已复验"
+        : state.feedbackAwaitingRecovery
+          ? "等待恢复原哈希"
+          : state.feedbackVerificationPending
+            ? "等待复验"
+            : state.feedbackStatus === "prepared"
+              ? "已准备，待钱包发送"
+              : "未准备";
+    text("feedback-status", feedbackStatusText);
+    renderFeedbackDisclosure();
     const opcValue = state.opcStatus && (state.opcStatus.status || state.opcStatus.state);
     text("opc-status", opcValue === "active" ? "Agent 已授权" : "未授权");
     text("claim-status", state.claimVerified
@@ -1645,9 +2214,34 @@
     action("revoke-prepare", !state.connected || !state.authenticated || !canPrepareRevoke || state.revokePrepared);
     action("revoke-chain", !state.connected || !state.authenticated || !state.revokePrepared || !!state.revokeTxHash);
     action("revoke-verify", !state.authenticated || !(state.revokeTxHash || enteredRevokeHash) || state.chainRevoked);
+    action("agent-refresh", !state.connected || !state.authenticated);
+    let feedbackScoreValid = false;
+    try {
+      const scoreNode = $("feedback-score");
+      feedbackScoreValue(scoreNode && scoreNode.value !== "" ? scoreNode.value : state.feedbackScore);
+      feedbackScoreValid = true;
+    } catch (_) {
+      feedbackScoreValid = false;
+    }
+    const feedbackReady = state.connected && state.authenticated
+      && identity && identity.verified === true
+      && state.purchaseState === "delivered" && !!state.purchaseSettlement && purchaseId === state.purchaseId;
+    const feedbackLocked = !!state.feedbackTxHash || state.feedbackAwaitingRecovery;
+    action("feedback-prepare", !feedbackReady || !feedbackScoreValid || feedbackLocked);
+    let draftMatches = false;
+    try { draftMatches = feedbackDraftMatches(purchaseId); } catch (_) { /* Invalid edited input is not a draft. */ }
+    action("feedback-submit", !feedbackReady || !draftMatches || feedbackLocked);
+    const scoreInput = $("feedback-score");
+    if (scoreInput) scoreInput.disabled = !!state.feedbackHash;
+    const feedbackInput = $("feedback-tx-hash");
+    const enteredFeedbackHash = feedbackInput && hash(feedbackInput.value);
+    action("feedback-query", !state.authenticated || !purchaseId);
+    action("feedback-verify", !state.authenticated || !(state.feedbackTxHash || enteredFeedbackHash)
+      || purchaseId !== state.feedbackPurchaseId);
     if (claimHash && state.claimTxHash && !claimHash.value) claimHash.value = state.claimTxHash;
     if (allowanceHash && state.allowanceTxHash && !allowanceHash.value) allowanceHash.value = state.allowanceTxHash;
     if (revokeHash && state.revokeTxHash && !revokeHash.value) revokeHash.value = state.revokeTxHash;
+    if (feedbackInput && state.feedbackTxHash && !feedbackInput.value) feedbackInput.value = state.feedbackTxHash;
     if (state.purchaseSettlement) {
       addTxLink("tx-links", state.purchaseSettlement.transaction_hash);
     } else {
@@ -1661,6 +2255,7 @@
       connect,
       "switch-network": switchNetwork,
       "wallet-verify": verifyWallet,
+      "agent-refresh": refreshAgentIdentity,
       "claim-approve": claimTestUsd,
       "claim-verify": () => verifyClaim(),
       "grant-verify": verifyGrant,
@@ -1673,6 +2268,10 @@
       execute: executePurchase,
       "purchase-query": queryPurchase,
       "purchase-recover": recoverPurchase,
+      "feedback-submit": submitFeedback,
+      "feedback-prepare": prepareFeedback,
+      "feedback-query": queryFeedback,
+      "feedback-verify": () => verifyFeedback(),
       "revoke-prepare": prepareRevoke,
       "revoke-chain": sendRevoke,
       "revoke-verify": () => verifyRevoke(),
@@ -1690,6 +2289,10 @@
     if (revokeHash) revokeHash.oninput = () => render();
     const purchaseInput = $("purchase-id");
     if (purchaseInput) purchaseInput.oninput = () => render();
+    const feedbackScore = $("feedback-score");
+    if (feedbackScore) feedbackScore.oninput = () => render();
+    const feedbackHash = $("feedback-tx-hash");
+    if (feedbackHash) feedbackHash.oninput = () => render();
   }
 
   async function init() {
@@ -1719,6 +2322,7 @@
     connect,
     switchNetwork,
     verifyWallet,
+    refreshAgentIdentity,
     claimTestUsd,
     verifyClaim,
     verifyGrant,
@@ -1732,12 +2336,18 @@
     execute: executePurchase,
     queryPurchase,
     recoverPurchase,
+    prepareFeedback,
+    submitFeedback,
+    queryFeedback,
+    verifyFeedback,
     prepareRevoke,
     sendRevoke,
     verifyRevoke,
     validateTypedData,
     validateClaimTransaction,
     validateAllowanceTransaction,
+    validateFeedbackTransaction,
+    buildFeedbackCalldata: feedbackCalldata,
     validateRevokeTransaction,
     state: () => ({
       phase: state.phase,
@@ -1764,6 +2374,17 @@
       idempotency_key: state.idempotencyKey,
       purchase_id: state.purchaseId,
       purchase_state: state.purchaseState,
+      agent_identity: state.agentIdentity,
+      feedback_score: state.feedbackScore,
+      feedback_status: state.feedbackStatus,
+      feedback_hash: state.feedbackHash,
+      feedback_uri: state.feedbackUri,
+      feedback_tx_hash: state.feedbackTxHash,
+      feedback_verification_pending: state.feedbackVerificationPending,
+      feedback_verified: state.feedbackVerified,
+      feedback_index: state.feedbackIndex,
+      feedback_revoked: state.feedbackRevoked,
+      feedback_awaiting_recovery: state.feedbackAwaitingRecovery,
       core_revoked: state.coreRevoked,
       revoke_prepared: state.revokePrepared,
       revoke_tx_hash: state.revokeTxHash,

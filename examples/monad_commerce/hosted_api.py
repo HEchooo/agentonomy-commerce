@@ -125,6 +125,10 @@ class Recover(Empty):
     csv_text: str | None = Field(default=None, min_length=1, max_length=131072)
 
 
+class FeedbackScore(Empty):
+    score: int = Field(strict=True, ge=0, le=100)
+
+
 def _origin_parts(origin: str, *, allow_loopback_http: bool) -> tuple[str, str, bool]:
     """Validate an origin and return ``(origin, host, secure_cookie)``."""
 
@@ -409,6 +413,41 @@ def create_app(
     def stylesheet():
         return FileResponse(STATIC / "app.css", media_type="text/css")
 
+    @app.get("/agent.svg")
+    def agent_image():
+        return FileResponse(STATIC / "agent.svg", media_type="image/svg+xml")
+
+    @app.get("/agent.json")
+    @app.get("/.well-known/agent-registration.json")
+    def agent_registration():
+        try:
+            with lock:
+                value = service().registration_document()
+            if not isinstance(value, Mapping):
+                raise _OperationUnconfirmed
+            return _safe_response(value, reject_token=True)
+        except Exception:
+            raise _OperationUnconfirmed from None
+
+    @app.get("/erc8004/feedback/{digest}.json")
+    def public_feedback(digest: str):
+        if not re.fullmatch(r"[0-9a-f]{64}", digest):
+            return _error_response({"error": "not_found"}, 404)
+        try:
+            with lock:
+                value = service().public_feedback('0x' + digest)
+            if value is None:
+                return _error_response({"error": "not_found"}, 404)
+            if not isinstance(value, Mapping):
+                raise _OperationUnconfirmed
+            return _safe_response(value, reject_token=True)
+        except Exception:
+            raise _OperationUnconfirmed from None
+
+    @app.get("/api/agent")
+    def agent_identity(request: Request):
+        return dispatch(request, "agent_identity", {}, mutating=False)
+
     @app.get("/api/status")
     def status(request: Request):
         return dispatch(request, "status", {}, mutating=False)
@@ -500,6 +539,24 @@ def create_app(
             raise _OperationUnconfirmed
         args = {"purchase_id": purchase_id, **body.model_dump(exclude_none=True)}
         return dispatch(request, "recover_purchase", args, mutating=True)
+
+    @app.post("/api/purchases/{purchase_id}/feedback/prepare")
+    def feedback_prepare(request: Request, purchase_id: str, body: FeedbackScore):
+        if not re.fullmatch(ID_PATTERN, purchase_id):
+            raise _OperationUnconfirmed
+        return dispatch(request, "feedback_prepare", {"purchase_id": purchase_id, **body.model_dump()}, mutating=True)
+
+    @app.post("/api/purchases/{purchase_id}/feedback/verify")
+    def feedback_verify(request: Request, purchase_id: str, body: Transaction):
+        if not re.fullmatch(ID_PATTERN, purchase_id):
+            raise _OperationUnconfirmed
+        return dispatch(request, "feedback_verify", {"purchase_id": purchase_id, **body.model_dump()}, mutating=True)
+
+    @app.get("/api/purchases/{purchase_id}/feedback")
+    def feedback_status(request: Request, purchase_id: str):
+        if not re.fullmatch(ID_PATTERN, purchase_id):
+            raise _OperationUnconfirmed
+        return dispatch(request, "feedback_status", {"purchase_id": purchase_id}, mutating=False)
 
     @app.post("/api/revoke/prepare")
     def revoke_prepare(request: Request, _body: Empty):

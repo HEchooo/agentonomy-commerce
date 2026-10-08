@@ -11,6 +11,7 @@ import httpx
 READ_METHODS = frozenset({
     "eth_chainId", "eth_blockNumber", "eth_getBlockByNumber", "eth_getBlockByHash",
     "eth_getTransactionReceipt", "eth_getTransactionByHash", "eth_getCode",
+    "eth_getStorageAt",
     "eth_getBalance", "eth_call", "eth_estimateGas", "eth_gasPrice",
     "eth_getTransactionCount", "eth_maxPriorityFeePerGas", "web3_clientVersion",
 })

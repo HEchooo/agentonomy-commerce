@@ -42,6 +42,7 @@
         <div><dt>收款地址</dt><dd id="payee">—</dd></div>
         <div><dt>TestUSD余额</dt><dd id="balance">—</dd></div>
         <div><dt>预算条款</dt><dd id="terms">—</dd></div>
+        <div><dt>ERC-8004 身份</dt><dd id="agent-identity-status">尚未读取</dd></div>
       </dl>
     </aside>
 
@@ -75,6 +76,35 @@
         </div>
         <pre id="opc-message">安装挑战尚未准备。</pre>
       </div>
+    </section>
+
+    <section class="erc8004">
+      <div class="heading"><h2>ERC-8004 服务身份与反馈</h2><span>明确读取、明确签名</span></div>
+      <p class="note">身份读取不会自动发送交易。只有当前钱包、已交付且付款已复验的订单，才可以准备买方反馈。</p>
+      <div class="actions">
+        <button id="agent-refresh" class="quiet" disabled>读取并复验服务身份</button>
+      </div>
+      <dl>
+        <div><dt>Agent ID</dt><dd id="agent-id">—</dd></div>
+        <div><dt>Identity Registry</dt><dd id="agent-registry">—</dd></div>
+        <div><dt>服务 owner</dt><dd id="agent-owner">—</dd></div>
+        <div><dt>服务钱包</dt><dd id="agent-wallet">—</dd></div>
+        <div><dt>Agent URI</dt><dd id="agent-uri">—</dd></div>
+        <div><dt>Reputation Registry</dt><dd id="reputation-registry">—</dd></div>
+      </dl>
+      <label for="feedback-score">反馈分数（0–100）</label>
+      <input id="feedback-score" type="number" min="0" max="100" step="1" inputmode="numeric" autocomplete="off" placeholder="例如 87">
+      <div class="actions">
+        <button id="feedback-prepare" class="quiet" disabled>准备并查看公开内容</button>
+        <button id="feedback-submit" disabled>确认公开并发送反馈</button>
+        <button id="feedback-query" class="quiet" disabled>查询反馈状态</button>
+      </div>
+      <p id="feedback-status" class="note">未准备</p>
+      <p class="note">反馈会公开买方钱包、分数、付款交易和结果摘要；不会公开 CSV 或报告。准备后分数固定，发送会消耗测试网 gas。</p>
+      <pre id="feedback-disclosure">先准备并查看公开内容，再明确发送。</pre>
+      <label for="feedback-tx-hash">已有反馈交易哈希（仅用于重试同一验证）</label>
+      <input id="feedback-tx-hash" inputmode="text" autocomplete="off" placeholder="0x…">
+      <button id="feedback-verify" class="quiet" disabled>复验同一反馈交易</button>
     </section>
 
     <section class="work">

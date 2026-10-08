@@ -9,7 +9,7 @@ User=agentonomy-web
 Group=agentonomy-web
 # hosted_server binds the process to 127.0.0.1:8092; the proxy owns public TLS.
 WorkingDirectory=/opt/agentonomy-commerce/current
-ExecStart=/opt/agentonomy-commerce/current/.venv/bin/python -m examples.monad_commerce.hosted_server --config /var/lib/agentonomy-web/configuration.json --state-dir /var/lib/agentonomy-web/state --origin https://review.agentonomy.xyz --port 8092
+ExecStart=/opt/agentonomy-commerce/current/.venv/bin/python -m examples.monad_commerce.hosted_server --config /var/lib/agentonomy-web/configuration.json --state-dir /var/lib/agentonomy-web/state --origin https://review.agentonomy.xyz --erc8004-config /etc/agentonomy-commerce/erc8004.json --port 8092
 Restart=on-failure
 RestartSec=5
 UMask=0077
