@@ -142,6 +142,11 @@ class HostedCanary(PublicCanary):
             purchase_id = args.get('purchase_id')
             existing = self.market.request('purchase', {'purchase_id': purchase_id})
             preview = self.market.request('preview_state', {'preview_id': existing['preview_id']})
+        installation = args.get('opc_installation_id')
+        if installation is not None and preview.get('opc_installation_id') != installation:
+            # Reject before entering the global relayer lane. Runtime/Core
+            # independently repeat this check at execution and reservation.
+            raise ValueError('OPC installation mismatch')
         # A previously verified order remains a query/delivery recovery. Core's
         # existing idempotency and paid-input checks own its replay protection.
         try:

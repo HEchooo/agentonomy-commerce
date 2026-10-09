@@ -31,7 +31,7 @@ def evidence():
                 block_hash='0x'+'bb'*32, finality_block_hash='0x'+'cc'*32)
 
 
-def setup(result, *, existing=None, expired=False):
+def setup(result, *, existing=None, expired=False, installation=None):
     canary = HostedCanary.__new__(HostedCanary)
     canary.gate = FakeGate()
     canary.tenant_id, canary.owner = 'tenant_a', OWNER
@@ -41,7 +41,8 @@ def setup(result, *, existing=None, expired=False):
     def request(method, args):
         calls.append(method)
         if method == 'preview_state':
-            return {'preview_id': 'preview_a', 'expires_at': (datetime.now(UTC)+timedelta(seconds=-1 if expired else 300)).isoformat()}
+            return {'preview_id': 'preview_a', 'opc_installation_id': installation,
+                    'expires_at': (datetime.now(UTC)+timedelta(seconds=-1 if expired else 300)).isoformat()}
         if method == 'purchase':
             if existing is None:
                 raise RuntimeError('purchase_not_found')
@@ -58,6 +59,18 @@ def test_expired_and_nonexistent_preview_does_not_pin_global_lane():
     with pytest.raises(ValueError, match='expired'):
         canary.request('execute', {'preview_id': 'preview_a'})
     assert not canary.gate.calls and 'execute' not in calls
+
+
+@pytest.mark.parametrize('method', ['execute', 'recover_purchase'])
+def test_wrong_device_cannot_pin_global_payment_lane(method):
+    pending = {'purchase_id': 'purchase_a', 'preview_id': 'preview_a',
+               'state': 'payment_submitted', 'settlement': {'verified': False}}
+    canary, calls = setup(pending, installation='opc_device_a',
+                          existing=pending if method == 'recover_purchase' else None)
+    args = {'preview_id': 'preview_a'} if method == 'execute' else {'purchase_id': 'purchase_a'}
+    with pytest.raises(ValueError, match='installation mismatch'):
+        canary.request(method, args | {'opc_installation_id': 'opc_device_b'})
+    assert not canary.gate.calls and method not in calls
 
 
 def test_verified_canonical_core_result_releases_lane():

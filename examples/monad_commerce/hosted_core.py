@@ -42,6 +42,7 @@ from services.account_service.opc_service import (
 )
 from services.account_service.schemas import (
     AccountSession,
+    AuthorizationResolutionRequest,
     PublicAccountSession,
     SpendingGrantRequest,
 )
@@ -588,6 +589,23 @@ class HostedWalletCore(ExternalWalletCore):
         self.wallet_identity = identity
         self.grant = grant
 
+    def resolve_authorization(self, payload: dict[str, Any]) -> dict:
+        request = AuthorizationResolutionRequest.model_validate(payload)
+        if request.opc_installation_id is None:
+            return super().resolve_authorization(payload)
+        authority = None
+        try:
+            authority = self.opc_service.authorization_scope(
+                request.opc_installation_id, user_id=request.user_id, agent_id=request.agent_id,
+            )
+        except ValueError:
+            pass
+        # Same canonical resolution used by the shared Core HTTP adapter.
+        # Funding independently checks this installation again in its ledger.
+        return self.account_service.resolve_authorization(
+            request, opc_authorization=authority,
+        ).model_dump(mode='json')
+
     def opc_pair(
         self, proof: str, browser_digest: object, csrf_digest: object
     ) -> dict[str, Any]:
@@ -663,7 +681,17 @@ class HostedWalletCore(ExternalWalletCore):
         return self.opc_service.issue_token(proof)
 
     def opc_status(self, proof: str) -> dict[str, Any]:
-        return self.opc_service.status(proof)
+        result = self.opc_service.status(proof)
+        if result.get('status') == 'active':
+            try:
+                self.opc_service.authorization_scope(
+                    result['installation_id'], user_id=USER_ID, agent_id=AGENT_ID,
+                )
+            except ValueError:
+                # Status must reflect the effective consent/grant lifetime,
+                # rather than a durable row that has not yet been amended.
+                result = result | {'status': 'consent_required'}
+        return result
 
     def opc_authenticate(self, access_token: str) -> dict[str, Any]:
         principal = self.opc_service.authenticate_access_token(access_token)

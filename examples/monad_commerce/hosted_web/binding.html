@@ -1,0 +1,113 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="Bind your wallet and manage your Agent's spending authorization.">
+  <title>Wallet binding · Agentonomy</title>
+  <link rel="stylesheet" href="/binding.css">
+</head>
+<body>
+  <header>
+    <a href="/">Agentonomy</a>
+    <span>Wallet &amp; Agent access</span>
+  </header>
+  <main>
+    <div class="intro">
+      <span class="eyebrow">YOUR WALLET, YOUR PERMISSION</span>
+      <h1>Connect your wallet<br>to your Agent.</h1>
+      <p>Choose your wallet, set a spending limit, and approve your device.
+        Continue everything else in your Agent conversation.</p>
+    </div>
+    <p id="message" class="notice" role="status" aria-live="polite">Choose a wallet provider and account.</p>
+
+    <section class="card" aria-labelledby="wallet-title">
+      <h2 id="wallet-title">1. Bind your wallet</h2>
+      <p>Use a wallet available in this browser. Select the account you want to bind.</p>
+      <p id="wallet-empty">No wallets detected yet. Open this page in a browser with your wallet extension enabled.</p>
+      <div id="wallet-list" role="group" aria-label="Available wallets"></div>
+      <div id="account-list" role="group" aria-label="Wallet accounts"></div>
+      <label for="network-select">Supported network</label>
+      <select id="network-select">
+        <option value="">Choose a configured network</option>
+      </select>
+      <p>Select the matching network in your wallet before signing in.</p>
+      <div class="actions">
+        <button id="login" type="button" disabled>Sign in with wallet</button>
+        <button id="logout" class="quiet" type="button" disabled>Sign out</button>
+      </div>
+    </section>
+
+    <section class="card" aria-labelledby="overview-title">
+      <h2 id="overview-title">Your binding</h2>
+      <dl>
+        <dt>Wallet</dt><dd id="wallet-state">No wallet selected</dd>
+        <dt>Account</dt><dd id="owner">Not selected</dd>
+        <dt>Network ID</dt><dd id="chain">Not read</dd>
+        <dt>Asset</dt><dd id="token">Not selected</dd>
+        <dt>Session</dt><dd id="auth-state">Wallet login required</dd>
+        <dt>Spending access</dt><dd id="phase-state">Not started</dd>
+        <dt>Limits &amp; expiry</dt><dd id="terms-state">No active authorization terms</dd>
+      </dl>
+    </section>
+
+    <section class="card" aria-labelledby="budget-title">
+      <h2 id="budget-title">2. Authorize spending</h2>
+      <p>Your wallet confirms the spending terms and finite allowance. This demo uses valueless test assets.</p>
+      <p id="budget-state">No budget binding</p>
+      <div class="actions">
+        <button id="grant" type="button" disabled>Approve spending terms</button>
+        <button id="budget" type="button" disabled>Sign budget limits</button>
+      </div>
+      <div class="actions">
+        <button id="claim" class="quiet" type="button" disabled>Claim test assets</button>
+        <button id="allowance" type="button" disabled>Approve finite allowance</button>
+      </div>
+    </section>
+
+    <section class="card" aria-labelledby="device-title">
+      <h2 id="device-title">3. Approve your Agent device</h2>
+      <p>Start the connection from your Agent to open its device request here.</p>
+      <p id="device-state">No device request loaded</p>
+      <div class="actions">
+        <button id="device-claim" type="button" disabled>Link this device</button>
+        <button id="device-approve" type="button" disabled>Sign device consent</button>
+        <button id="device-refresh" class="quiet" type="button" disabled>Refresh</button>
+      </div>
+      <details>
+        <summary>Bound devices</summary>
+        <pre id="device-list">No bound devices</pre>
+      </details>
+    </section>
+
+    <details class="card full">
+      <summary>Revoke spending access</summary>
+      <p>Stop new spending in Core and confirm revocation in your wallet.</p>
+      <p id="revoke-state">No revoke requested</p>
+      <button id="revoke" type="button" disabled>Revoke authorization</button>
+    </details>
+
+    <details class="card full">
+      <summary>Network &amp; authorization details</summary>
+      <pre id="advanced-details">Choose a configured network to view its public contract details.</pre>
+    </details>
+
+    <details class="card full">
+      <summary>Verify an existing wallet transaction</summary>
+      <p>If confirmation was interrupted, verify the original transaction hash from your wallet.</p>
+      <label for="claim-hash">Test asset claim hash</label>
+      <input id="claim-hash" autocomplete="off" spellcheck="false">
+      <div class="actions"><button id="claim-verify" class="quiet" type="button" disabled>Verify existing claim</button></div>
+      <label for="allowance-hash">Allowance hash</label>
+      <input id="allowance-hash" autocomplete="off" spellcheck="false">
+      <div class="actions"><button id="allowance-verify" class="quiet" type="button" disabled>Verify existing allowance</button></div>
+      <label for="revoke-hash">Revocation hash</label>
+      <input id="revoke-hash" autocomplete="off" spellcheck="false">
+      <div class="actions"><button id="revoke-verify" class="quiet" type="button" disabled>Verify existing revoke</button></div>
+    </details>
+    <footer>Your wallet keeps its keys. Every signature and transaction requires your confirmation.</footer>
+  </main>
+  <script src="/wallet_selection.js"></script>
+  <script src="/binding.js"></script>
+</body>
+</html>

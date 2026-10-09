@@ -11,8 +11,8 @@ import stat
 
 import uvicorn
 
-from examples.monad_commerce.hosted_api import create_app
-from examples.monad_commerce.hosted_service import HostedCommerceService
+from examples.monad_commerce.external_api import create_external_app as create_app
+from examples.monad_commerce.external_opc import ExternalHostedCommerceService as HostedCommerceService
 
 
 def load_configuration(path):

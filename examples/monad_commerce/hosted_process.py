@@ -30,6 +30,7 @@ HOSTED_FIELDS = {
     'opc_token': {'proof'},
     'opc_authenticate': {'access_token'},
     'opc_status': {'proof'},
+    'opc_revoke': {'proof'},
     'payment_safety': {'purchase_id'},
 }
 SETUP_FIELDS = {
@@ -59,6 +60,10 @@ def dispatch_hosted(runtime, method, params):
         fields = set(params)
     if fields is None or set(params) != fields:
         raise ValueError('operation outside hosted Core scope')
+    if method == 'opc_revoke':
+        # Revocation remains possible after the spending grant expires. The
+        # canonical OPC service verifies device ownership from the proof.
+        return runtime.opc_service.revoke(params['proof'])
     if method == 'browser_resume':
         from datetime import UTC, datetime
         from sqlalchemy import select

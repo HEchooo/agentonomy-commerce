@@ -498,6 +498,10 @@ class HostedCommerceService:
                                          csrf_digest=row['csrf_digest'])
             if operation in {'grant_verify', 'budget_payload', 'budget_bind'}:
                 return canary.onboarding(operation, **args)
+            if operation in {'verify_claim', 'verify_approval', 'verify_revocation'}:
+                if set(args) != {'transaction_hash'}:
+                    raise ValueError('original wallet transaction hash required')
+                return getattr(canary, operation)(tx_hash=args['transaction_hash'])
             if operation in {'purchase', 'recover_purchase'}:
                 if operation == 'recover_purchase' and self.registry is not None:
                     existing = canary.request('purchase', {'purchase_id': args['purchase_id']})

@@ -172,9 +172,9 @@ class TenantCanary:
         self._event("approval_transaction", **params)
         return {"to": self.config["deployment"]["token"], "data": "0xapprove"}
 
-    def verify_approval(self, **params):
-        self._event("verify_approval", **params)
-        if params["transaction_hash"] != TX_HASH or not self.budget_ready:
+    def verify_approval(self, tx_hash):
+        self._event("verify_approval", tx_hash=tx_hash)
+        if tx_hash != TX_HASH or not self.budget_ready:
             raise ValueError("allowance proof rejected")
         self.allowance_ready = True
         return {"status": "allowance_verified"}

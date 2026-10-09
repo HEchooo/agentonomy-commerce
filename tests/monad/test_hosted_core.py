@@ -3,6 +3,7 @@ from __future__ import annotations
 from copy import deepcopy
 from datetime import UTC, datetime, timedelta
 import hashlib
+import json
 from pathlib import Path
 import stat
 import time
@@ -36,6 +37,64 @@ EXECUTOR = "0x" + "55" * 20
 PAYEE = "0x" + "66" * 20
 APPROVAL_TX = "0x" + "aa" * 32
 OPC_ORIGIN = "http://127.0.0.1:8091"
+
+
+def test_external_device_authorization_resolution_uses_live_core_consent(core_factory, tmp_path):
+    core = core_factory(tmp_path)
+    try:
+        browser, csrf, _ = _onboard(core)
+        device = DeviceSigningKey.generate()
+        def proof(action):
+            return sign_opc_proof(device, origin=OPC_ORIGIN, allow_loopback_http=True,
+                                  action=action, request_id='external-' + action, now=int(time.time()))
+        pairing = core.opc_pair(proof('pair'), browser, csrf)
+        core.opc_approve(browser, csrf, pairing['session_id'], _sign_personal(pairing['message_to_sign'], OWNER))
+        request = {'user_id': 'commerce-demo-user', 'agent_id': 'hermes',
+                   'opc_installation_id': pairing['installation_id'], 'product': 'marketplace',
+                   'venue': 'clink_marketplace', 'merchant': 'commerce_analytics',
+                   'merchant_trust_tier': 'clink_verified', 'network': 'eip155:31337',
+                   'token_address': TOKEN, 'asset': TOKEN, 'spender_address': EXECUTOR,
+                   'amount_usdc': '0.30', 'destination': PAYEE,
+                   'resource': 'https://merchant.agentonomy.invalid/v1/reconcile'}
+        assert core.resolve_authorization(request)['ready'] is True
+        dispatch_hosted(core, 'opc_revoke', {'proof': proof('revoke')})
+        assert core.resolve_authorization(request)['ready'] is False
+    finally:
+        core.close()
+
+
+@pytest.mark.parametrize('expiry_target', ['device', 'grant'])
+def test_external_device_status_matches_bridge_and_effective_expiry(core_factory, tmp_path, expiry_target):
+    from services.account_service.opc_service import OpcInstallationRow
+    from examples.monad_commerce.external_opc import public_device_status
+    from examples.monad_commerce.opc_bridge import CommerceOpcClient
+    core = core_factory(tmp_path)
+    try:
+        browser, csrf, _ = _onboard(core)
+        device = DeviceSigningKey.generate()
+        def proof(action):
+            return sign_opc_proof(device, origin=OPC_ORIGIN, allow_loopback_http=True,
+                                  action=action, request_id='contract-' + action, now=int(time.time()))
+        pairing = core.opc_pair(proof('pair'), browser, csrf)
+        core.opc_approve(browser, csrf, pairing['session_id'], _sign_personal(pairing['message_to_sign'], OWNER))
+        raw = core.opc_status(proof('status'))
+        assert raw['status'] == 'active' and 'user_id' in raw
+        client = CommerceOpcClient.__new__(CommerceOpcClient)
+        client.state = SimpleNamespace(installation_id=pairing['installation_id'])
+        assert client._valid_status_response(public_device_status(json.loads(json.dumps(raw, default=str))))
+        assert 'spending_grant_id' not in public_device_status(raw)
+        with core.repository._write_session() as tx:
+            if expiry_target == 'device':
+                tx.get(OpcInstallationRow, pairing['installation_id']).consent_expires_at = datetime.now(UTC) - timedelta(seconds=1)
+            else:
+                tx.get(SpendingGrantRow, core.grant.spending_grant_id).expires_at = datetime.now(UTC) - timedelta(seconds=1)
+        expired = core.opc_status(proof('status'))
+        assert expired['status'] == 'consent_required'
+        assert client._valid_status_response(public_device_status(json.loads(json.dumps(expired, default=str))))
+        with pytest.raises(ValueError):
+            core.opc_token(proof('token'))
+    finally:
+        core.close()
 
 
 class _Signer:
