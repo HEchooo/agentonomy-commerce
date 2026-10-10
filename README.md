@@ -8,9 +8,9 @@ payment independently, asks the merchant to validate the receipt, and returns
 the result to the user. The user never gives the Agent a private key.
 
 Wallet authorization site: [review.agentonomy.xyz](https://review.agentonomy.xyz)
-· Monad testnet · valueless test assets. The external Codex flow described below
-is implemented locally; its public rollout and fresh own-wallet acceptance are
-still pending.
+· Monad testnet · valueless test assets. The wallet site and external MCP flow
+are deployed publicly. Fresh own-wallet purchase acceptance is still pending;
+deployment and signer readiness do not establish a completed purchase.
 
 ## The concrete example
 
@@ -174,8 +174,9 @@ future public acceptance:
 | Evidence | Status |
 | --- | --- |
 | Local behavior | Tested implementations cover budget limits, expiry, revocation, replay protection, paid-order recovery, execution isolation, and feedback verification. |
-| External Agent integration | Local checks cover device proof, browser consent, authenticated MCP transport, effective consent expiry, device-scoped execution, and wallet selection. The new public flow has not yet been accepted on the live deployment. |
+| External Agent integration | Local checks cover device proof, browser consent, authenticated MCP transport, effective consent expiry, device-scoped execution, and wallet selection. On 2026-10-10 the external flow was deployed publicly; the configured Codex stdio bridge initialized and queried its unpaired device state against the live service. Wallet consent and a live purchase remain pending. |
 | Monad testnet deployment | Recorded on 2026-10-08: two chain-10143 contracts and the ERC-8004 registration for Agent 2073 were deployed; two independently operated RPC paths checked the deployment, and the HTTPS registration metadata was deployed and verified. |
+| Public rollout | On 2026-10-10, release `dd3e8e8` was deployed with existing state retained. Public binding assets and registration metadata returned HTTPS 200, anonymous account access returned 401, and the isolated signer passed role/address validation and both KMS DryRuns. The unavailable secondary RPC was replaced with Ankr; both providers agreed on the finalized boundary and deployed contract hashes. No purchase was signed or broadcast during these checks. |
 | Fresh public own-wallet acceptance | Pending: purchase, delivery, same-order replay, revoke, and second-wallet isolation still require a new live acceptance run. |
 
 These records do not claim a complete live closed loop, production adoption, or
@@ -189,9 +190,10 @@ checkout, interpreter, and a private device-state path:
 
 ```toml
 [mcp_servers.agentonomy_commerce]
-command = "/absolute/path/agentonomy-commerce/.venv/bin/python"
-args = ["-m", "examples.monad_commerce.opc_bridge", "--origin", "https://review.agentonomy.xyz", "--state", "/absolute/private/path/agentonomy-commerce/device.json", "--label", "My Codex"]
+command = "/usr/bin/env"
+args = ["-i", "PATH=/usr/bin:/bin", "LANG=en_US.UTF-8", "PYTHONPATH=/absolute/path/agentonomy-commerce", "/absolute/path/agentonomy-commerce/.venv/bin/python", "-m", "examples.monad_commerce.opc_bridge", "--origin", "https://review.agentonomy.xyz", "--state", "/absolute/private/path/agentonomy-commerce/device.json", "--label", "My Codex"]
 cwd = "/absolute/path/agentonomy-commerce"
+startup_timeout_sec = 30
 tool_timeout_sec = 240
 ```
 
@@ -199,8 +201,10 @@ These stdio configuration fields are documented in the
 [Codex MCP guide](https://developers.openai.com/codex/mcp). Keep the private
 device state outside the repository. It contains a local device proof key,
 never a wallet key or AWS credential. Access credentials stay in bridge memory.
+The clean environment prevents the bridge from inheriting operator AWS
+credentials. Reload the Codex MCP connection after saving the configuration.
 
-After the public rollout, the demonstration is:
+Once wallet consent is complete, the demonstration is:
 
 1. Ask Codex to connect the Agentonomy Commerce wallet. Complete wallet,
    budget, finite allowance, and device consent in the opened account page.
@@ -208,13 +212,20 @@ After the public rollout, the demonstration is:
    reconciliation service and request a preview with a stable idempotency key.
 3. Execute that preview. If payment or delivery is pending, query or recover
    the original purchase ID until its verified result is available.
-4. Repeat the same purchase to show the original result and transaction hash,
+4. Execute the same `preview_id` again to show the original result and transaction hash,
    then revoke authorization from the wallet page and show that a new purchase
    is denied.
 
 Only the wallet owner signs login, authorization, allowance, and revocation.
 The bridge has no AWS access; the isolated server signer receives only a fixed
 Core-authorized execution.
+The server signer requires a valid short-lived role session. An operator must
+renew that session before it expires; an expired session blocks execution.
+
+Recording guides: [technical demo, up to three minutes](docs/video-technical-demo.zh-CN.md)
+and [product pitch, up to two minutes](docs/video-pitch.zh-CN.md). Use the same
+verified run for both videos and capture all purchase material before revoking
+the finite grant; the current demo cannot renew that grant for another run.
 
 ## Run locally
 
