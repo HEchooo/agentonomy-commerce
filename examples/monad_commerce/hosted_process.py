@@ -12,7 +12,7 @@ import subprocess
 import sys
 
 ROOT = Path(__file__).resolve().parents[2]
-for source in (ROOT / 'apps/marketplace', ROOT / 'apps/node'):
+for source in (ROOT / 'apps/marketplace', ROOT / 'apps/node', ROOT / 'apps/core'):
     if str(source) not in sys.path:
         sys.path.insert(0, str(source))
 from examples.monad_commerce.public_bridge import PublicCoreBridge
