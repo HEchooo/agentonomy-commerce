@@ -177,6 +177,7 @@ future public acceptance:
 | External Agent integration | Local checks cover device proof, browser consent, authenticated MCP transport, effective consent expiry, device-scoped execution, and wallet selection. On 2026-10-10 the external flow was deployed publicly; the configured Codex stdio bridge initialized and queried its unpaired device state against the live service. Wallet consent and a live purchase remain pending. |
 | Monad testnet deployment | Recorded on 2026-10-08: two chain-10143 contracts and the ERC-8004 registration for Agent 2073 were deployed; two independently operated RPC paths checked the deployment, and the HTTPS registration metadata was deployed and verified. |
 | Public rollout | On 2026-10-10, release `dd3e8e8` was deployed with existing state retained. Public binding assets and registration metadata returned HTTPS 200, anonymous account access returned 401, and the isolated signer passed role/address validation and both KMS DryRuns. The unavailable secondary RPC was replaced with Ankr; both providers agreed on the finalized boundary and deployed contract hashes. No purchase was signed or broadcast during these checks. |
+| Recording preflight | On 2026-10-11, missing approved contract code-hash pins were restored and clean worker startup was fixed. Release `3b8e459` passed an isolated hosted Core startup check; public HTTPS, signer readiness, both KMS DryRuns, dual-RPC deployment checks, and Agent 2073 identity verification passed. The relevant local suites passed 714 tests. Buyer state was unchanged: TestUSD claim, authorization, purchase, and revoke remain pending. |
 | Fresh public own-wallet acceptance | Pending: purchase, delivery, same-order replay, revoke, and second-wallet isolation still require a new live acceptance run. |
 
 These records do not claim a complete live closed loop, production adoption, or
@@ -221,6 +222,8 @@ The bridge has no AWS access; the isolated server signer receives only a fixed
 Core-authorized execution.
 The server signer requires a valid short-lived role session. An operator must
 renew that session before it expires; an expired session blocks execution.
+Keep the approved `token_code_hash` and `executor_code_hash` in the hosted
+deployment manifest; only the worker bootstrap omits them.
 
 Recording guides: [technical demo, up to three minutes](docs/video-technical-demo.zh-CN.md)
 and [product pitch, up to two minutes](docs/video-pitch.zh-CN.md). Use the same
