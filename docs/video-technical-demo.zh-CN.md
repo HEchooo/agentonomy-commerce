@@ -1,8 +1,8 @@
 # Agentonomy Commerce 技术演示脚本（不超过 3 分钟）
 
-> **录制状态**：这是一份录制 runbook，不是已完成验收的证明。公网钱包购买、
-> 用户反馈签名和撤销拒绝必须在本次录制中重新取得实际返回值；新评分、服务历史
-> 和授权续期代码目前只能按“待部署／待真实验收”准备，不能旁白成已在线成功。
+> **录制状态**：公网版本已部署，当前发布版本的健康检查和配置预检已通过；这
+> 仍不是已完成验收的证明。公网钱包购买、交付、同 preview 重放、用户反馈签名
+> 和撤销拒绝必须在本次录制中重新取得实际返回值，不能旁白成已在线成功。
 
 目标镜头是一条 Monad 测试网闭环：外部 Codex 只通过
 agentonomy_commerce MCP server 请求服务；钱包页面处理身份、有限预算、
@@ -19,6 +19,20 @@ TestUSD 是没有货币价值的测试资产。本脚本不把本地模拟或历
 
 - 只连接名为 agentonomy_commerce 的 MCP server。录制前核对实际连接状态、
   钱包、设备、预算、allowance 和服务身份；不要用静态文字补齐缺失字段。
+- 2026-10-13 的公网预检确认匿名状态接口拒绝、绑定和反馈脚本与已测试源码一致、
+  两条 RPC 的 chain 10143 部署与身份核对，以及隔离签名器的两次 KMS DryRun。
+  独立 CommerceOpcClient 已列出 11 个业务工具；搜索、详情和服务历史查询成功，
+  购买前的已观察交付次数和买家评分样本均为 0，买家平均评分为空。
+- 仅报价的预检已返回 0.30 TestUSD，payment_capability.auto_pay_compatible 为 true；
+  随后 readiness 为 ready，已用 0.00、预占 0.00、剩余 1.00。该预检没有 execute、
+  KMS 实际签名或广播。不要执行这个预检 preview；录制时使用新的 RUN_LABEL
+  和本次真实返回的 preview_id。
+- 若当前 Codex MCP 窗口显示 Transport closed，先在 Settings → MCP servers →
+  Restart 后重查连接。独立进程成功不等于当前录制窗口已经恢复连接。
+- 本轮预检时设备／授权到北京时间 2026-10-13 11:53:18，KMS 临时会话到
+  12:24:34；录制前重新读取实际 expires_at，不要照搬这些时效。
+- 当前返回中的 legacy settlement_submissions 是 relayer 的 pending nonce，
+  不是本次购买次数。重放证据比较原 purchase、交易 hash 和余额，不据此推算扣款。
 - 当前演示配置是 1.00 TestUSD 总额、0.50 单笔上限、一天有效期和 1.00 的
   有限 allowance；录制画面以本次实际返回为准。授权撤销留到全部购买、重放、
   反馈和历史镜头完成之后。

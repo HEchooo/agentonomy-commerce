@@ -215,12 +215,13 @@ future public acceptance:
 | Evidence | Status |
 | --- | --- |
 | Local behavior | Tested implementations cover budget limits, expiry, revocation, replay protection, paid-order recovery, execution isolation, and feedback verification. |
-| External Agent integration | Local checks cover device proof, browser consent, authenticated MCP transport, effective consent expiry, device-scoped execution, and wallet selection. On 2026-10-10 the external flow was deployed publicly; the configured Codex stdio bridge initialized and queried its unpaired device state against the live service. Wallet consent and a live purchase remain pending. |
+| External Agent integration | Local checks cover device proof, browser consent, authenticated MCP transport, effective consent expiry, device-scoped execution, and wallet selection. On 2026-10-10 the external flow was deployed publicly; the configured Codex stdio bridge initialized and queried its unpaired device state against the live service. During that check, wallet consent and a live purchase were pending; the current 2026-10-13 preflight is recorded separately below. |
 | Monad testnet deployment | Recorded on 2026-10-08: two chain-10143 contracts and the ERC-8004 registration for Agent 2073 were deployed; two independently operated RPC paths checked the deployment, and the HTTPS registration metadata was deployed and verified. |
+| Current public deployment preflight | On 2026-10-13, the commerce release was deployed with wallet state retained. Anonymous account/status access returned 401; binding and feedback assets returned HTTPS 200 and matched the tested source. Two RPC providers agreed on the chain-10143 deployment and service identity; both isolated-signer KMS DryRuns passed. A clean external MCP client listed all 11 business tools and successfully queried search, details and shared history. A 0.30 TestUSD preview reported Core-authorized automatic payment; the subsequent readiness query showed 1.00 remaining, 0.00 used and 0.00 reserved. No purchase was executed or broadcast during this preflight. A fresh desktop MCP reconnect and own-wallet acceptance are still required. |
 | Public rollout | On 2026-10-10, release `dd3e8e8` was deployed with existing state retained. Public binding assets and registration metadata returned HTTPS 200, anonymous account access returned 401, and the isolated signer passed role/address validation and both KMS DryRuns. The unavailable secondary RPC was replaced with Ankr; both providers agreed on the finalized boundary and deployed contract hashes. No purchase was signed or broadcast during these checks. |
 | Recording preflight | On 2026-10-11, missing approved contract code-hash pins were restored and clean worker startup was fixed. Release `3b8e459` passed an isolated hosted Core startup check; public HTTPS, signer readiness, both KMS DryRuns, dual-RPC deployment checks, and Agent 2073 identity verification passed. The relevant local suites passed 714 tests. Buyer state was unchanged: TestUSD claim, authorization, purchase, and revoke remain pending. |
-| Commerce history and reauthorization | On 2026-10-13, the full Monad suite passed 732 tests and the related Core budget suite passed 21. A continuous local Anvil scenario covered two real contract payments across grant renewal, distinct revocations, original-order replay/recovery, and restart without another charge. Buyer feedback and shared history passed local boundary tests; fresh public acceptance remains pending. |
-| Fresh public own-wallet acceptance | Pending: purchase, delivery, same-order replay, revoke, and second-wallet isolation still require a new live acceptance run. |
+| Commerce history and reauthorization | On 2026-10-13, 734 Monad tests, 21 Core budget tests, 101 commerce/review tests, 86 imported marketplace tests, and 6 submission checks passed. A continuous local Anvil scenario covered two real contract payments across grant renewal, distinct revocations, original-order replay/recovery, and restart without another charge. Buyer feedback and shared history passed local boundary tests. A public Marketplace startup namespace collision was reproduced and fixed in `1892f64`, with real clean-process startup regression coverage; search and details subsequently passed against the public MCP endpoint. Fresh purchase and feedback acceptance remain pending. |
+| Fresh public own-wallet acceptance | Pending: a new run must still prove purchase, delivery, same-order replay, buyer feedback signing and independent readback, revoke, and second-wallet isolation. |
 
 These records do not claim a complete live closed loop, production adoption, or
 a security audit. TestUSD has no monetary value.
@@ -272,6 +273,16 @@ The bridge has no AWS access; the isolated server signer receives only a fixed
 Core-authorized execution.
 The server signer requires a valid short-lived role session. An operator must
 renew that session before it expires; an expired session blocks execution.
+For a configuration-only preflight, run as the same OS user that owns the
+protected configuration and runs the web service. Ownership and mode checks
+remain enabled; running as root is not an equivalent preflight:
+
+    .venv/bin/python -m examples.monad_commerce.hosted_server --config <private-config> --state-dir <private-state-dir> --origin https://review.agentonomy.xyz --erc8004-config <private-erc8004-config> --validate-only
+
+This validates the protected deployment inputs and exits with broadcast false
+without starting the listener. A configuration_valid result does not prove
+wallet consent, a purchase, delivery, feedback, or revocation; those remain
+fresh-run acceptance criteria.
 Keep the approved `token_code_hash` and `executor_code_hash` in the hosted
 deployment manifest; only the worker bootstrap omits them.
 
