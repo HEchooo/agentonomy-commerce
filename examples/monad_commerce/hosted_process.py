@@ -190,7 +190,35 @@ def _core_main(state_dir):
 
 
 def _market_main(state_dir):
+    # Marketplace owns the top-level ``services`` and ``shared`` imports used
+    # by HostedCommerceRuntime.  The module-level path order stays Core-first
+    # for the Core worker; only this Marketplace child gives its application
+    # tree first resolution before the first Marketplace import.
+    marketplace_source = str(ROOT / 'apps/marketplace')
+    if marketplace_source in sys.path:
+        sys.path.remove(marketplace_source)
+    sys.path.insert(0, marketplace_source)
     from examples.monad_commerce.hosted_market_runtime import HostedCommerceRuntime
+    # Marketplace must remain first for ``shared.models`` and ``services``.
+    # The hosted bootstrap validator also needs the Core-only OPC protocol;
+    # append the Core shared tree to this already-loaded Marketplace package
+    # instead of replacing the package or clearing ``sys.modules``.
+    import shared
+    shared_roots = [
+        str(ROOT / 'apps/marketplace/shared'),
+        str(ROOT / 'apps/core/shared'),
+    ]
+    shared.__path__[:] = shared_roots + [
+        path for path in shared.__path__ if path not in shared_roots
+    ]
+    import services
+    service_roots = [
+        str(ROOT / 'apps/marketplace/services'),
+        str(ROOT / 'apps/core/services'),
+    ]
+    services.__path__[:] = service_roots + [
+        path for path in services.__path__ if path not in service_roots
+    ]
     runtime = None
     try:
         while True:
