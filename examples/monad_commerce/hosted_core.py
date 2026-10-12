@@ -36,6 +36,7 @@ from examples.monad_commerce.public_core import (
     _now,
     _whole_second_now,
 )
+from agentonomy_commerce.wallet_transactions import transaction_hash
 from services.account_service.opc_service import (
     OPC_INSTALLATION_PURPOSE,
     OpcAccountService,
@@ -409,6 +410,93 @@ class HostedWalletCore(ExternalWalletCore):
             **self._metadata["grant_challenge"],
             "signing_method": "personal_sign",
             "grant_request": self._metadata["grant_request"],
+        }
+
+    def _renewal_safety_check(self) -> None:
+        super()._renewal_safety_check()
+        if self.grant is None or self.grant.status != "revoked":
+            return
+        journal_path = self.state_dir / "operator" / "wallet-operations.json"
+        try:
+            import json
+
+            record = json.loads(journal_path.read_text(encoding="utf-8"))
+            revocation = record.get("revocation") if isinstance(record, dict) else None
+        except (OSError, UnicodeError, json.JSONDecodeError):
+            revocation = None
+        expected_grant_id = self.grant.spending_grant_id
+        expected_chain_grant_id = (
+            self.budget_binding.grant_id if self.budget_binding is not None else None
+        )
+        try:
+            journal_grant_id = revocation.get("spending_grant_id")
+            journal_chain_grant_id = transaction_hash(revocation.get("chain_grant_id"))
+            current_chain_grant_id = transaction_hash(expected_chain_grant_id)
+        except (AttributeError, TypeError, ValueError):
+            journal_grant_id = None
+            journal_chain_grant_id = None
+            current_chain_grant_id = None
+        if not isinstance(revocation, dict) or not (
+            revocation.get("core_revoked") is True
+            and revocation.get("verified") is True
+            and revocation.get("chain_revoked") is True
+            and revocation.get("status") == "verified"
+            and journal_grant_id == expected_grant_id
+            and journal_chain_grant_id is not None
+            and journal_chain_grant_id == current_chain_grant_id
+        ):
+            raise ValueError("Core grant renewal is blocked until chain revocation is proven terminal")
+
+    def grant_renew_challenge(
+        self, browser_digest: object, csrf_digest: object
+    ) -> dict[str, Any]:
+        """Create a fresh browser-bound grant generation after terminal state."""
+
+        session = self._authorized_browser_session(browser_digest, csrf_digest)
+        if self.wallet_identity is None:
+            raise ValueError("wallet identity must be verified before Core grant renewal")
+        if self.grant is None or self._phase() not in {"expired", "revoked"}:
+            raise ValueError("Core grant renewal requires a terminal grant")
+        self._renewal_safety_check()
+        existing = self._metadata.get("renewal_challenge")
+        if existing is not None:
+            try:
+                expires_at = datetime.fromisoformat(existing["expires_at"])
+            except (KeyError, TypeError, ValueError) as exc:
+                raise CorePersistenceError("persistent public Core renewal challenge expiry is invalid") from exc
+            existing_session = self._renewal_challenge_session()
+            if (
+                existing_session.created_by_public_account_session_id
+                == session.public_account_session_id
+                and _now() < expires_at.astimezone(UTC)
+            ):
+                request = self._metadata.get("renewal_request")
+                if not isinstance(request, dict):
+                    raise CorePersistenceError("persistent public Core renewal request is missing")
+                return {
+                    **existing,
+                    "signing_method": "personal_sign",
+                    "grant_request": request,
+                }
+            if self._metadata.get("renewal_signature") is not None:
+                raise CorePersistenceError(
+                    "persistent public Core renewal challenge outcome requires inspection"
+                )
+
+        request = self._new_renewal_request(session.public_account_session_id)
+        self._metadata["renewal_request"] = request.terms_payload()
+        self._persist_state()
+        challenge = self.account_service.create_spending_grant_challenge(request)
+        self._metadata["renewal_challenge"] = {
+            "session_id": challenge.session_id,
+            "message_to_sign": challenge.message_to_sign,
+            "expires_at": challenge.expires_at.astimezone(UTC).isoformat(),
+        }
+        self._persist_state()
+        return {
+            **self._metadata["renewal_challenge"],
+            "signing_method": "personal_sign",
+            "grant_request": self._metadata["renewal_request"],
         }
 
     def _browser_authorization(self, session: PublicAccountSession) -> dict[str, Any]:

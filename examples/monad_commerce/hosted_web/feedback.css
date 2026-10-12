@@ -1,0 +1,150 @@
+:root {
+  --feedback-ink: #18362f;
+  --feedback-muted: #66766f;
+  --feedback-line: #d4ddd8;
+  --feedback-accent: #1c6b54;
+  --feedback-paper: #f5f7f5;
+  --feedback-warm: #fbfaf5;
+}
+
+body {
+  background:
+    radial-gradient(circle at 88% 4%, rgba(216, 234, 223, .72), transparent 30rem),
+    var(--feedback-paper);
+}
+
+main {
+  max-width: 960px;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  padding-top: 58px;
+  gap: 18px;
+}
+
+.intro {
+  max-width: 700px;
+  margin-bottom: 16px;
+}
+
+.intro h1 {
+  color: var(--feedback-ink);
+  font-size: clamp(38px, 6vw, 64px);
+  letter-spacing: -1.8px;
+  line-height: 1.08;
+}
+
+.intro p {
+  max-width: 560px;
+  font-size: 14px;
+}
+
+.notice {
+  border: 1px solid #cbded4;
+  background: rgba(224, 238, 232, .82);
+  border-radius: 12px;
+}
+
+.card {
+  border-color: rgba(194, 208, 201, .96) !important;
+  border-radius: 16px !important;
+  box-shadow: 0 10px 28px rgba(30, 62, 49, .055);
+  background: rgba(255, 255, 255, .9) !important;
+}
+
+.section-kicker {
+  color: var(--feedback-accent);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: .14em;
+  margin-bottom: 8px;
+}
+
+.facts {
+  border-top: 1px solid var(--feedback-line);
+  margin-top: 20px;
+  padding-top: 14px;
+}
+
+.facts dd {
+  color: var(--feedback-ink);
+  font-size: 12px;
+}
+
+.wallet-facts {
+  margin-top: 22px;
+}
+
+.choice-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.choice-list:empty {
+  display: none;
+}
+
+.choice-list button {
+  border-radius: 999px;
+  background: var(--feedback-warm);
+  border-color: var(--feedback-line);
+  color: var(--feedback-ink);
+  font-size: 12px;
+}
+
+.choice-list button[aria-pressed="true"] {
+  background: var(--feedback-accent);
+  border-color: var(--feedback-accent);
+  color: #fff;
+}
+
+.actions {
+  margin-top: 18px;
+}
+
+button {
+  border-radius: 999px;
+  padding: 11px 18px;
+}
+
+button.quiet {
+  background: var(--feedback-warm);
+}
+
+.quiet-text,
+.auth-help {
+  color: var(--feedback-muted);
+  font-size: 12px;
+}
+
+.auth-help a {
+  color: var(--feedback-accent);
+  font-weight: 650;
+}
+
+.warning {
+  border-left: 3px solid #bd7b22;
+  color: #805414;
+  padding-left: 12px;
+}
+
+.recovery-card {
+  border-color: #dfc89c !important;
+  background: #fffcf4 !important;
+}
+
+.verified-card {
+  border-color: #9ac5ae !important;
+  background: #f5fbf7 !important;
+}
+
+footer {
+  color: var(--feedback-muted);
+  font-size: 12px;
+}
+
+@media (max-width: 680px) {
+  main {
+    padding-top: 34px;
+  }
+}

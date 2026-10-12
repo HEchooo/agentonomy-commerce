@@ -1,91 +1,154 @@
 # Agentonomy Commerce 技术演示脚本（不超过 3 分钟）
 
-> **录制前提**：公网钱包购买尚未完成实测。一轮真实闭环录屏可以同时作为验收和视频素材：先完成授权、0.30 TestUSD 购买、交付和同一 `preview_id` 重放，最后才撤销；两份视频可使用同一 `RUN_LABEL`、preview 和交易证据。独立重录需使用新的未授权地址，或先补齐授权续期功能。
+> **录制状态**：这是一份录制 runbook，不是已完成验收的证明。公网钱包购买、
+> 用户反馈签名和撤销拒绝必须在本次录制中重新取得实际返回值；新评分、服务历史
+> 和授权续期代码目前只能按“待部署／待真实验收”准备，不能旁白成已在线成功。
 
-完成钱包与设备授权后，这段录屏展示一条真实的 Monad 测试网闭环：外部 Codex 只通过名为
-`agentonomy_commerce` 的 MCP server 请求服务，钱包页面完成授权，服务身份由
-ERC-8004 校验，Core 约束预算，BudgetExecutor 完成测试网转账，Marketplace
-交付 CSV 报表。浏览器只负责钱包登录、签名、有限批准、设备同意和撤销；Codex
-不会接触私钥、助记词或钱包签名材料。不要让 Codex 调用本机现有的
-`clink_node` MCP server。
+目标镜头是一条 Monad 测试网闭环：外部 Codex 只通过
+agentonomy_commerce MCP server 请求服务；钱包页面处理身份、有限预算、
+allowance、设备同意和反馈签名；Core 约束预算，BudgetExecutor 执行
+TestUSD 转账，Marketplace 交付 CSV 报表。Codex 不接触私钥、助记词、浏览器
+token、AWS/KMS 会话或原始签名材料。不要让 Codex 调用本机现有的 clink_node
+MCP server。
 
-画面直接展示运行中的 Codex/MCP 请求和真实交付结果，不用 slides 或代码
-walkthrough 代替产品行为。
-
-TestUSD 是测试网测试代币，没有货币价值。本脚本不使用本地模拟成功代替
-真实支付；如果录制中的付款或交付处于 pending/unknown，按脚本查询或恢复原订单，
-不要新建替代付款。
+TestUSD 是没有货币价值的测试资产。本脚本不把本地模拟或历史 canary 当作本次
+真实支付；付款、交付、反馈或撤销处于 pending/unknown 时，只查询或恢复原记录，
+不创建替代付款。
 
 ## 录制前准备
 
-- 只连接名为 `agentonomy_commerce` 的 MCP server。不要调用本机现有的
-  `clink_node` MCP server，也不要把两个 server 混用。
-- 录制开始前准备好一次真实的有限授权状态：钱包已经登录，画面可显示实际的
-  总额、单笔上限、有效期和当前设备同意。示例配置是 1.00 TestUSD 总额、0.50
-  单笔上限、一天有效期和 BudgetExecutor 最高 1.00 TestUSD 有限批准；以钱包
-  实际返回值为准。新绑定可以剪入一段很短的浏览器片段，但不要声称登录、签名、
-  approve 和设备授权都能在 25 秒内完成。撤销安排为本轮最后的授权动作。
-- 在第一次 preview 前生成本次录制唯一的 `RUN_LABEL`（例如当天日期加随机短
-  后缀），并在本轮所有请求中复用它；不要使用跨天固定的幂等键。录制画面角注
-  使用 `【录制前替换：RUN_LABEL】`，实际录制时只需替换这一处。技术演示和
-  pitch 共用本次 RUN 的 preview/交易证据；授权撤销只放在全部素材的最后。
-- 录制前确认 readiness/status 的实际返回。只展示其中真实出现的
-  `agent_identity` 字段，例如 `verified`、`agent_id`、`agent_registry`、
-  `agent_uri`、`agent_wallet` 或 `reputation_registry`；字段没有返回时不要用
-  静态文字补齐。
-- 以下交易哈希只允许填入本次录制实际返回的值：
-  `【录制前替换：purchase_tx_hash】`、
-  `【录制前替换：purchase_tx_url】`、
-  `【录制前替换：revoke_tx_hash】`、
-  `【录制前替换：revoke_tx_url】`。不要填历史 canary 或示例交易。
-  链接不是固定 MCP 返回字段；若钱包未提供链接，只展示实际交易哈希即可。
-- 不要在画面中显示浏览器 token、私钥、助记词、AWS/KMS 会话、内部数据库
-  或未授权的签名数据。
+- 只连接名为 agentonomy_commerce 的 MCP server。录制前核对实际连接状态、
+  钱包、设备、预算、allowance 和服务身份；不要用静态文字补齐缺失字段。
+- 当前演示配置是 1.00 TestUSD 总额、0.50 单笔上限、一天有效期和 1.00 的
+  有限 allowance；录制画面以本次实际返回为准。授权撤销留到全部购买、重放、
+  反馈和历史镜头完成之后。
+- 如果开录前状态是 expired 或 revoked，先走新的授权流程：在官方同源钱包页
+  生成新的 grant、签新的 budget、重新完成设备 consent。旧 grant、旧订单和
+  旧历史保留；不要重新领取 faucet，也不要删除状态。若存在 pending/unknown
+  资金动作，先 recover 原 purchase，再开始新授权。
+- 第一次 preview 前生成本轮唯一的 RUN_LABEL（日期加随机后缀），所有请求
+  复用它；新尝试使用 RUN_LABEL-after-revoke。以下字段只填本次真实返回值：
+  purchase_id、purchase_tx_hash、feedback_score、feedback_tx_hash、
+  revoke_tx_hash、history_sample_size、history_mean_score 和
+  history_freshness。
+- 录制不展示私钥、助记词、浏览器 token、OPC proof、AWS/KMS 会话、内部数据库
+  或 raw signed payload。交易链接不是固定返回字段；没有实际 URL 时只显示实际
+  hash。
+
+## MCP 工具路由和实际 schema
+
+get_clink_connection_status、connect_clink_wallet 和 list_clink_business_tools
+按 server 实际暴露方式使用。下面 11 个业务工具全部必须通过
+agentonomy_commerce.call_clink_business_tool，参数外层固定为
+{"name":"工具名","arguments":{...}}；不能直接调用同名工具或 Core、商家、钱包
+接口。
+
+| 工具 | arguments 合同 |
+| --- | --- |
+| get_clink_account_readiness | {} |
+| search_clink_services | query 为 string，最多 200 字符 |
+| get_clink_service_details | 必填 offering_id |
+| create_clink_purchase_preview | 必填 offering_id、csv_text、idempotency_key；csv_text 最多 131072 字符 |
+| execute_clink_purchase | 必填 preview_id |
+| get_clink_purchase | 必填 purchase_id |
+| recover_clink_purchase | 必填 purchase_id；csv_text 可选，非空且最多 131072 字符 |
+| prepare_clink_purchase_feedback | 必填 purchase_id 和整数 score，0 <= score <= 100；只准备，不发送交易 |
+| get_clink_purchase_feedback | 必填 purchase_id；独立读取原反馈和当前撤销状态 |
+| verify_clink_purchase_feedback | 必填 purchase_id 和匹配 ^0x[0-9a-fA-F]{64}$ 的 transaction_hash；只复验，不签名发送 |
+| get_clink_service_history | 必填 offering_id；返回成交与评分分离的公开历史、样本数和 freshness |
 
 ## 可复制的 Codex 用户 prompt
 
-```text
-请只使用名为 agentonomy_commerce 的 MCP server 完成一次可审计的 Agentonomy Commerce 录制。绝对不要调用本机现有的 clink_node MCP server。不要调用 Core、商家或钱包的直连接口，也不要要求我粘贴私钥、助记词、session token 或任何签名材料。
+~~~text
+请只使用名为 agentonomy_commerce 的 MCP server 完成一次可审计的 Agentonomy
+Commerce 录制。不要调用 clink_node MCP server，不要直连接 Core、商家或钱包，
+不要要求我粘贴私钥、助记词、session token 或任何签名材料。
 
-连接类 onboarding 工具 get_clink_connection_status、connect_clink_wallet、list_clink_business_tools 可以按 server 暴露方式使用；下面七个业务工具必须全部通过 agentonomy_commerce 的 call_clink_business_tool 调用，不能直接调用同名工具：get_clink_account_readiness、search_clink_services、get_clink_service_details、create_clink_purchase_preview、execute_clink_purchase、get_clink_purchase、recover_clink_purchase。每次 wrapper 调用都使用 {"name":"...","arguments":{...}}。
+先调用 get_clink_connection_status；若不是 active，通过 connect_clink_wallet
+打开官方钱包页面。我只在那里完成已经准备好的有限授权和当前设备 consent。
+若状态是 expired 或 revoked，先完成新的 grant、budget 签名和设备 consent；
+保留旧记录，不领取 faucet。若已有 pending/unknown 付款，先 recover 原
+purchase，不能开新付款。
 
-1. 先调用 get_clink_connection_status。若不是 active，调用 connect_clink_wallet 打开官方钱包页面；我只在那里完成已经准备好的有限授权和当前设备同意，等待状态变为 active。录制可以插入一段新绑定片段，撤销留到本轮最后。
-2. 通过 call_clink_business_tool 调用 get_clink_account_readiness，展示实际返回的 agent_identity。只有实际返回 verified=true、agent_wallet 和网络符合服务详情时才继续；字段缺失就如实标注，不要补写。
-3. 调用 list_clink_business_tools 查看实际定义。再通过 wrapper 调用 search_clink_services，参数 {"query":"csv"}。从搜索实际返回的服务对象保存 exact offering_id；如果没有 offering_id 就停止。不得猜测或硬编码 offering_id。用这个 exact offering_id 通过 wrapper 调用 get_clink_service_details，核对实际报价为 0.30 TestUSD 且在已签署预算内。
-4. 先生成本次录制唯一的 RUN_LABEL（日期加随机短后缀），同一轮后续请求都复用它。用 idempotency_key = RUN_LABEL + "-csv"，通过 wrapper 调用 create_clink_purchase_preview。CSV 必须逐字使用下面内容：
+调用 list_clink_business_tools 查看实际定义。此后 11 个业务工具都通过
+call_clink_business_tool，外层参数为 {"name":"...","arguments":{...}}。
+调用 get_clink_account_readiness，只有实际返回的 agent_identity 已验证且与
+服务详情一致才继续；缺字段就停止并如实展示。
 
+通过 wrapper 调用 search_clink_services，参数 {"query":"csv"}，保存搜索结果
+中的 exact offering_id；没有 offering_id 就停止。用它调用
+get_clink_service_details，再调用 get_clink_service_history 展示购买前的实际
+历史。如果历史为空，显示实际的空结果，不补写评分、样本数或平均分。
+
+生成本轮唯一 RUN_LABEL，后续 idempotency_key 使用 RUN_LABEL + "-csv"。用 exact
+offering_id 调用 create_clink_purchase_preview。CSV 必须逐字使用：
+
+CSV:
 transaction_id,date,description,amount,currency,category
 demo-income-1,2026-10-10,Sample sale,125.00,USD,sales
 demo-expense-1,2026-10-10,Sample coffee,-12.50,USD,meals
 demo-expense-2,2026-10-11,Sample supplies,-8.25,USD,office
 demo-refund-1,2026-10-12,Sample refund,20.00,USD,refunds
 
-5. 用返回的 preview_id 通过 wrapper 调用 execute_clink_purchase 一次。展示实际返回的 purchase_id、preview_id、state、output_hash、service_result 以及 settlement/receipt 中实际存在的字段；如果返回 transaction_hash、verified、finality 等就展示，缺失字段不要补写。报告应显示 income 145.00 USD、expense 20.75 USD、net 124.25 USD；category totals 保留符号：sales 125.00、meals -12.50、office -8.25、refunds 20.00。
-6. 如果付款或交付 pending/unknown，只能通过 wrapper 调用 get_clink_purchase 查询原 purchase_id，或调用 recover_clink_purchase 恢复原订单；不要创建替代 preview、不要再次付款。交付完成后，必须通过 wrapper 对同一个 preview_id 再调用一次 execute_clink_purchase，验证返回的 purchase_id 和 settlement 中实际的交易字段不变；get_clink_purchase 只能用于查询，不能冒充重放。
-7. 把撤销放在本轮最后：暂停，等我在官方钱包页面完成 Core 与链上授权撤销。不要把网页 grant revoke 预设为永久 opc_revoke；撤销后先直接调用 get_clink_connection_status，展示实际 status；它可能是 consent_required，也可能是 revoked，不要硬写其中一个。不要再读取 readiness、续期或重连设备。随后只用新的 idempotency_key = RUN_LABEL + "-after-revoke" 通过 wrapper 尝试一次同一 CSV 的新 preview。若 wrapper 在 preview/execute 前返回 status=authorization_required、code=WALLET_AUTHORIZATION_REQUIRED 或其他实际拒绝，原样展示并停止；不要把它描述成链上失败或预算超限。只有实际返回 preview_id 才继续 execute。不要创建新授权或重试付款；不要声称已撤销的 MCP 还能查询旧订单。若要展示旧订单，只能标注为撤销前已返回并保存的记录。
-```
+用返回的 preview_id 通过 wrapper 调用 execute_clink_purchase 一次。只展示实际
+返回的 purchase_id、state、output_hash、service_result 和 settlement/receipt
+字段；如果有 transaction_hash、verified 或 finality 就展示，否则不要补写。
+输入对应的报告应为 income 145.00 USD、expense 20.75 USD、net 124.25 USD，
+分类保留 sales 125.00、meals -12.50、office -8.25、refunds 20.00；实际返回
+不一致就停止。
+
+如果付款或交付 pending/unknown，只能用 get_clink_purchase 查询原订单或用
+recover_clink_purchase 恢复原订单。交付完成后，再把同一个 preview_id 通过
+wrapper 调用 execute_clink_purchase 一次；比较两次实际返回的 purchase_id、
+交易 hash、state 和 output_hash，确认原交易不变、没有第二笔付款。
+
+购买和重放证据保存后，询问我一个真实的 0 到 100 整数评分；绝不代我猜分。
+用原 purchase_id 调用 prepare_clink_purchase_feedback，打开它返回的同源反馈
+页面。我在自己的钱包页查看披露内容并签名发送反馈。拿到实际 transaction_hash
+后，用 verify_clink_purchase_feedback 通过 wrapper 复验；再用
+get_clink_purchase_feedback 独立回查原 purchase_id 和 original payment/output
+hash。没有实际 hash 或反馈仍 pending 时，保留原状态，不重发。
+
+随后用 exact offering_id 调用 get_clink_service_history，展示实际的已交付成交、
+评分分离、sample size、mean score 和 freshness。没有已验证反馈时只展示实际的
+无评分状态，不制造平均分或评价。
+
+把撤销放在本轮最后。我在官方钱包页面完成 Core 与链上授权撤销；只有实际返回
+时才显示 revoke transaction hash。回到 Codex 后先调用
+get_clink_connection_status，原样展示实际 status。用新的
+RUN_LABEL + "-after-revoke" 通过 wrapper 尝试同一 CSV 的新 preview；如果返回
+authorization_required、WALLET_AUTHORIZATION_REQUIRED 或其他实际拒绝，原样
+展示并停止，不再 execute、续期或重连。不要声称撤销后还能读取旧订单；旧订单
+只能标注为撤销前已经返回并保存的记录。
+~~~
 
 ## 时间轴、画面和旁白
 
 | 时间 | 画面操作 | 中文旁白 |
 | --- | --- | --- |
-| 0:00–0:10 | 打开 Codex 对话和服务入口，画面角落标出 `agentonomy_commerce`、`Monad chain 10143`、`TestUSD` 和 `TestUSD 无货币价值`。 | “这是 Agentonomy Commerce 的真实测试网演示。Agent 只通过 `agentonomy_commerce` MCP 请求服务，钱包密钥始终留在用户钱包里。” |
-| 0:10–0:25 | 从录制前已经准备好的授权状态开始；展示钱包中的实际总额、单笔上限、有效期和当前设备。可插入一段新绑定片段，但不压缩完整签名流程。回到 Codex，显示 `get_clink_connection_status = active`。 | “这一段从用户已经完成的有限授权开始：画面显示本次实际额度和设备。授权由浏览器完成，Codex 没有私钥。” |
-| 0:25–0:40 | 通过 `agentonomy_commerce` 的 `call_clink_business_tool` 调用 `get_clink_account_readiness`，展开实际返回的 `agent_identity` 字段。 | “购买前先验证服务身份。ERC-8004 把实际返回的 `agent_id`、`agent_uri`、`agent_wallet` 和 registry 绑定起来；它证明服务是谁，但不会替用户授予预算。” |
-| 0:40–1:00 | 展示 `list_clink_business_tools`，再通过 `call_clink_business_tool` 搜索 `csv`；使用搜索返回的 exact `offering_id` 查看详情、0.30 TestUSD 报价并创建 preview。 | “现在发现 CSV 对账服务，ID 来自搜索结果，不由脚本猜测。报价是 0.30 TestUSD，并在已签署预算内；输入和报价冻结后才进入执行。” |
-| 1:00–1:25 | 通过 wrapper 执行购买；展开 delivered 结果和 CSV 汇总，显示 `input_row_count=4`、`unique_transaction_count=4`、`income_totals`、`expense_totals`、`net_totals` 和 `by_category`。显示实际返回的订单、`output_hash` 和 settlement/receipt 字段；将实际交易字段按返回值替换为 `【录制前替换：purchase_tx_hash】` 和 `【录制前替换：purchase_tx_url】`。 | “报告有四行、四个唯一交易：收入 145.00，支出 20.75，净额 124.25 美元。分类保留方向：sales 125.00、meals -12.50、office -8.25、refunds 20.00。这里显示的是本次真实返回的订单、付款和交付证据。” |
-| 1:25–1:45 | 对同一个 `preview_id` 通过 wrapper 再调用一次 `execute_clink_purchase`；并排显示第一次和第二次实际返回的 `purchase_id`、settlement 交易字段、状态，以及 readiness 中实际提供的预算信息。不要用 `get_clink_purchase` 代替这次重放。 | “我重放的是同一个 preview，调用的仍是 execute。系统返回原订单和原交易字段，不产生第二笔扣款；查询工具只用于查看订单，不冒充重放。” |
-| 1:45–2:25 | 回到官方钱包页面完成 Core 与链上授权撤销；显示实际撤销哈希 `【录制前替换：revoke_tx_hash】` 和 `【录制前替换：revoke_tx_url】`。回到 Codex 读取连接状态，展示实际 `status`（可能是 `consent_required` 或 `revoked`）；用 `RUN_LABEL + "-after-revoke"` 通过 wrapper 尝试一次新 preview，展示实际授权拒绝。 | “最后撤销授权。撤销后，新的购买会被拒绝；撤销前的订单响应作为留存记录保存，访问权限和数据留存分别处理。” |
-| 2:25–2:55 | 画面停在撤销前已保存的订单结果、撤销状态和拒绝结果；遮挡所有密钥与会话材料。 | “这条链路展示的是测试网真实转账和独立结算证据，TestUSD 没有货币价值。视频中的交易哈希均来自本次录制。” |
+| 0:00–0:18 | 打开 Codex 和 agentonomy_commerce MCP，展示实际连接状态、Monad chain 10143、TestUSD 无货币价值。 | “这是 Agentonomy Commerce 的 Monad 测试网演示。Agent 通过 MCP 请求服务，钱包密钥始终留在用户钱包里。” |
+| 0:18–0:38 | 展示实际总额、单笔上限、有效期、allowance、设备同意和 agent_identity。 | “用户设定有限预算和设备范围。购买前，系统还要确认实际服务身份；ERC-8004 只说明服务是谁，不授予预算。” |
+| 0:38–0:58 | 搜索 csv，显示 exact offering_id、服务详情和购买前 get_clink_service_history 返回的实际样本/评分状态。 | “服务 ID 来自搜索结果。先看已经验证的服务历史；成交记录和买家评分是分开的，没有历史就明确显示为空。” |
+| 0:58–1:25 | 创建 preview，显示冻结的 0.30 TestUSD 报价和四行 CSV；执行一次，展开实际订单、支付证据、交付报告和 hash。 | “报价和输入先冻结，再由 Core 在授权范围内执行。这里只显示本次返回的支付和交付证据。” |
+| 1:25–1:45 | 对同一个 preview_id 再调用 execute，比较两次的 purchase、交易字段、state 和 output_hash。 | “这是同一 preview 的重放。系统返回原订单和原交易，不产生第二笔扣款。” |
+| 1:45–2:20 | 询问真实整数评分；调用 prepare，打开同源反馈页，由买家钱包查看披露内容并签名；用 verify 和 get 回查实际 original hash。 | “评分必须来自买家本人。准备工具不发送交易，钱包页面由用户签名；服务端随后独立复验原支付和结果绑定。” |
+| 2:20–2:38 | 调用 get_clink_service_history，显示真实 sample size、mean score、freshness；没有反馈就显示实际无评分。 | “历史只增加已验证的数据。当前只有一个 pilot 服务，不把一次评分包装成成熟的多商家市场。” |
+| 2:38–2:58 | 最后在钱包页面撤销授权；展示实际 revoke hash（若有）、状态和新 preview 的实际拒绝。 | “撤销后新的购买被授权边界拒绝。旧订单仍是撤销前的记录，不能变成新的权限。” |
 
 ## 录制时必须保留的结果
 
-画面应直接保留 MCP 实际返回的 `agent_identity`、`offering_id`、`preview_id`、
-`purchase_id`、`state`、`input_hash`、`output_hash`、`settlement`、receipt 和
-报表汇总；settlement 中若有 `transaction_hash`、`verified`、`status`、finality
-等字段则展示。重放必须再次调用同一个 `preview_id` 的
-`execute_clink_purchase`，并显示实际返回的订单/交易字段；撤销后的新尝试要保留
-原始拒绝 `status/reason`，例如实际返回的 `authorization_required` 和
-`WALLET_AUTHORIZATION_REQUIRED`。旧订单如需出镜，必须标注为撤销前已返回并保存的记录，
-不能暗示已撤销的 MCP 仍能访问它。任何字段缺失、身份未验证、付款状态未知或撤销
-结果未完成时，暂停录制并处理原状态；不要剪辑出一个看似成功的替代流程。
+保留 MCP 实际返回的 agent_identity、offering_id、购买前和购买后的
+service_history、preview_id、purchase_id、state、input_hash、output_hash、
+settlement、receipt、feedback transaction hash 和拒绝结果。反馈分数、样本数、
+平均分、时间和交易 hash 必须来自本次 run；不允许用历史 canary、示例值或旁白
+猜测替代。
+
+## 失败处理
+
+- 身份、网络、payee、报价、付款或交付证据缺失/矛盾时暂停，不剪辑出替代成功。
+- 付款结果 unknown 只恢复原 purchase；反馈结果 pending 只复验原 feedback hash，
+  不能重发评分或创建第二个支付。
+- grant/consent 过期或撤销时，走新 grant、新 budget 签名和新设备 consent；保留
+  旧订单和历史，不重新领取 faucet。结算中的原资金动作先 recover，再开始新流程。
+- 撤销后的新 preview 若没有返回授权拒绝而意外出现 preview_id，停止录制并保存
+  原始响应；不要继续 execute。

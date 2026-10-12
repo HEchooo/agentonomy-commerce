@@ -13,6 +13,8 @@ def canary(tmp_path):
     instance.operations_path = tmp_path / 'wallet-operations.json'
     instance.network = SimpleNamespace(token='0x' + '11' * 20, executor='0x' + '22' * 20)
     instance.owner = '0x' + '44' * 20
+    instance.market = None
+    instance.core = SimpleNamespace(onboarding=lambda *args, **kwargs: {})
     instance.onboarding = lambda *args, **kwargs: {'phase': 'ready'}
     return instance
 

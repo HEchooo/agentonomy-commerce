@@ -70,6 +70,8 @@ def test_actual_external_mcp_sdk_uses_core_identity_and_rejects_injected_owner(a
                         tools = (await session.list_tools()).tools
                         assert 'get_clink_account_readiness' in {tool.name for tool in tools}
                         assert 'recover_clink_purchase' in {tool.name for tool in tools}
+                        assert {'prepare_clink_purchase_feedback', 'get_clink_purchase_feedback',
+                                'verify_clink_purchase_feedback', 'get_clink_service_history'} <= {tool.name for tool in tools}
                         result = await session.call_tool('get_clink_account_readiness', {})
                         assert not result.isError
                         assert result.structuredContent['owner'] == OWNER_A

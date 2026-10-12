@@ -51,8 +51,9 @@ def main():
                 return 2
             method, params = request['method'], request['params']
             try:
-                no_params = {'onboarding_status', 'wallet_challenge', 'grant_challenge', 'budget_payload'}
-                signatures = {'wallet_verify', 'grant_verify', 'budget_bind'}
+                no_params = {'onboarding_status', 'wallet_challenge', 'grant_challenge',
+                             'budget_payload', 'grant_renew_challenge'}
+                signatures = {'wallet_verify', 'grant_verify', 'grant_renew_verify', 'budget_bind'}
                 if method in no_params and params == {}:
                     result = getattr(runtime, method)()
                 elif method in signatures and isinstance(params, dict) and set(params) == {'signature'}:

@@ -29,6 +29,7 @@ class PublicCoreBridge(CoreBridge):
     def onboarding(self, method, **params):
         if method not in {'onboarding_status', 'wallet_challenge', 'wallet_verify',
                           'grant_challenge', 'grant_verify', 'budget_payload',
-                          'budget_bind', 'allowance_verify'}:
+                          'budget_bind', 'allowance_verify', 'grant_renew_challenge',
+                          'grant_renew_verify'}:
             raise ValueError('unknown wallet setup operation')
         return self._call(method, params)

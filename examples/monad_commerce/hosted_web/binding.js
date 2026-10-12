@@ -601,13 +601,19 @@
       const before = await assertConfiguredWallet(operation);
       if (!state.authenticated || state.owner !== before.account) throw new Error("Wallet login is required first");
       await ensureSession(operation);
-      const challengePayload = await request("/api/grant/challenge", {method: "POST", body: {}}, operation);
-      const challenge = parseChallenge(challengePayload, "grant challenge");
+      // Refresh before choosing the lifecycle operation. A terminal grant is
+      // renewed explicitly; an active grant keeps the original idempotent
+      // challenge semantics.
+      await refreshStatusInternal(operation);
+      const renewal = state.phase === "expired" || state.phase === "revoked";
+      const prefix = renewal ? "/api/grant/renew" : "/api/grant";
+      const challengePayload = await request(prefix + "/challenge", {method: "POST", body: {}}, operation);
+      const challenge = parseChallenge(challengePayload, renewal ? "grant renewal challenge" : "grant challenge");
       const signature = await signPersonal(challenge.message, operation);
-      const verified = await request("/api/grant/verify", {method: "POST", body: {signature}}, operation);
+      const verified = await request(prefix + "/verify", {method: "POST", body: {signature}}, operation);
       state.phase = verified && verified.status ? verified.status : "grant verified";
       await refreshStatusInternal(operation);
-      showMessage("Spending grant verified.");
+      showMessage(renewal ? "Spending access re-authorized. Sign the new budget limits next." : "Spending grant verified.");
       return verified;
     });
 
@@ -1061,6 +1067,9 @@
           ? "" : "No wallet plugin announced an EIP-6963 provider. Open this page in a browser with a wallet plugin.";
       }
       setDisabled("login", state.busy || !state.account || !network);
+      const terminalGrant = state.phase === "expired" || state.phase === "revoked";
+      const grantButton = element("grant");
+      if (grantButton) grantButton.textContent = terminalGrant ? "Re-authorize spending" : "Approve spending terms";
       setDisabled("grant", state.busy || !state.authenticated);
       setDisabled("budget", state.busy || !state.authenticated);
       setDisabled("claim", state.busy || !state.authenticated);

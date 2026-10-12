@@ -36,6 +36,20 @@ class DeviceConsent(DeviceLink):
     signature: str = Field(pattern=r'^0x[0-9a-fA-F]{130}$')
 
 
+class RenewalSignature(BaseModel):
+    model_config = ConfigDict(extra='forbid', strict=True)
+    signature: str = Field(pattern=r'^0x[0-9a-fA-F]{130}$')
+
+
+class EmptyRenewal(BaseModel):
+    model_config = ConfigDict(extra='forbid', strict=True)
+
+
+class FeedbackTransaction(BaseModel):
+    model_config = ConfigDict(extra='forbid', strict=True)
+    transaction_hash: str = Field(pattern=r'^0x[0-9a-fA-F]{64}$')
+
+
 class MachineBoundary:
     def __init__(self, app, *, origin):
         self.app, self.origin = app, origin
@@ -150,6 +164,64 @@ def create_external_app(*, origin, runtime_factory):
             return _error_response({'error': 'binding_unavailable'}, 401)
         except Exception:
             return _error_response({'error': 'binding_unconfirmed'}, 409)
+
+    def renewal(request, operation, args):
+        try:
+            token, csrf = browser_tokens(request, mutation=True)
+        except PermissionError:
+            return _error_response({'error': 'csrf_required'}, 403)
+        try:
+            return _safe_response(service().dispatch(token, csrf, operation, args), reject_token=True)
+        except PermissionError:
+            return _error_response({'error': 'wallet_authorization_required'}, 401)
+        except Exception:
+            return _error_response({'error': 'grant_renewal_unconfirmed'}, 409)
+
+    @browser.post('/api/grant/renew/challenge')
+    def renewal_challenge(body: EmptyRenewal, request: Request):
+        return renewal(request, 'grant_renew_challenge', {})
+
+    @browser.post('/api/grant/renew/verify')
+    def renewal_verify(body: RenewalSignature, request: Request):
+        return renewal(request, 'grant_renew_verify', body.model_dump())
+
+    @browser.get('/feedback/{intent}')
+    def feedback_page(intent: str):
+        if not _valid_token(intent):
+            return _error_response({'error': 'not_found'}, 404)
+        return FileResponse(STATIC / 'feedback.html', headers={'Referrer-Policy': 'no-referrer'})
+
+    @browser.get('/feedback.js')
+    def feedback_script():
+        return FileResponse(STATIC / 'feedback.js', media_type='text/javascript')
+
+    @browser.get('/feedback.css')
+    def feedback_styles():
+        return FileResponse(STATIC / 'feedback.css', media_type='text/css')
+
+    @browser.get('/api/feedback/{intent}')
+    def feedback_consent(intent: str, request: Request):
+        try:
+            token, _ = browser_tokens(request, mutation=False)
+            return _safe_response(service().feedback_consent(token, intent), reject_token=True)
+        except PermissionError:
+            return _error_response({'error': 'feedback_authorization_required'}, 401)
+        except Exception:
+            return _error_response({'error': 'feedback_unconfirmed'}, 409)
+
+    @browser.post('/api/feedback/{intent}/verify')
+    def feedback_verify(intent: str, body: FeedbackTransaction, request: Request):
+        try:
+            token, csrf = browser_tokens(request, mutation=True)
+        except PermissionError:
+            return _error_response({'error': 'csrf_required'}, 403)
+        try:
+            return _safe_response(service().verify_feedback_consent(token, csrf, intent,
+                                  body.transaction_hash), reject_token=True)
+        except PermissionError:
+            return _error_response({'error': 'feedback_authorization_required'}, 401)
+        except Exception:
+            return _error_response({'error': 'feedback_unconfirmed'}, 409)
 
     machine = FastAPI(docs_url=None, redoc_url=None, openapi_url=None, redirect_slashes=False)
 

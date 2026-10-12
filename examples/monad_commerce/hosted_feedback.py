@@ -47,7 +47,8 @@ class FeedbackStore:
                   'verified': row['status'] == 'verified'}
         if row['evidence']:
             proof = json.loads(row['evidence'])
-            result.update(feedback_index=proof['feedback_index'], is_revoked=proof['is_revoked'])
+            result.update(feedback_index=proof['feedback_index'], is_revoked=proof['is_revoked'],
+                          last_verified_at=proof.get('verified_at'))
         if transaction and row['status'] == 'prepared':
             result['transaction'] = json.loads(row['transaction_payload'])
             doc = json.loads(row['document'])
@@ -114,10 +115,12 @@ class FeedbackStore:
                 or type(proof.get('feedback_index')) is not int or proof['feedback_index'] < 1
                 or type(proof.get('is_revoked')) is not bool):
                 raise ValueError('independent feedback evidence required')
+            proof = proof | {'verified_at': datetime.fromtimestamp(self.clock(), UTC).isoformat().replace('+00:00', 'Z')}
             self.db.execute('UPDATE erc8004_feedback SET status=?,evidence=? WHERE tenant_id=? AND purchase_id=?',
                             ('verified', canonical_document(proof), tenant_id, purchase_id))
             self.db.commit()
-        return self.status(tenant_id=tenant_id, purchase_id=purchase_id, buyer=buyer)
+        return self.status(tenant_id=tenant_id, purchase_id=purchase_id, buyer=buyer) | {
+            'verification_status': 'current' if proof is not None else 'unconfirmed'}
 
     def status(self, *, tenant_id, purchase_id, buyer):
         row = self._row(tenant_id, purchase_id, buyer)

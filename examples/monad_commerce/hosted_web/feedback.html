@@ -1,0 +1,105 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="Review and submit a prepared service feedback transaction.">
+  <title>Service feedback · Agentonomy</title>
+  <link rel="stylesheet" href="/binding.css">
+  <link rel="stylesheet" href="/feedback.css">
+</head>
+<body>
+  <header>
+    <a href="/">Agentonomy</a>
+    <span>Verified service feedback</span>
+  </header>
+
+  <main>
+    <section class="intro">
+      <span class="eyebrow">A PUBLIC SERVICE RECORD</span>
+      <h1>Leave a verified<br>trace of the work.</h1>
+      <p>This page shows the feedback your Agent prepared after a delivered service.
+        The buyer address, score, payment proof, and result proof below are public. Review them,
+        then send the one prepared transaction from your wallet.</p>
+    </section>
+
+    <p id="message" class="notice" role="status" aria-live="polite">Loading the feedback request…</p>
+
+    <section class="card" aria-labelledby="wallet-title">
+      <div class="section-kicker">01 · WALLET</div>
+      <h2 id="wallet-title">Choose the wallet that owns this request</h2>
+      <p id="wallet-help">Select a wallet and account already authorized for this Agent. The page never adds or switches networks.</p>
+      <p id="wallet-empty" class="quiet-text" hidden>No browser wallet was detected. Open this page in a wallet-enabled browser.</p>
+      <div id="wallet-list" class="choice-list" role="group" aria-label="Available wallets"></div>
+      <div id="account-list" class="choice-list" role="group" aria-label="Wallet accounts"></div>
+      <dl class="facts wallet-facts">
+        <dt>Selected account</dt><dd id="owner">Not selected</dd>
+        <dt>Wallet network</dt><dd id="wallet-chain">Not read</dd>
+        <dt>Request network</dt><dd id="request-chain">Not loaded</dd>
+      </dl>
+      <p id="auth-help" class="auth-help" hidden>Your wallet session is not available. <a id="auth-link" href="/">Open wallet authorization</a>, then return to this link.</p>
+    </section>
+
+    <section class="card" aria-labelledby="disclosure-title">
+      <div class="section-kicker">02 · DISCLOSURE</div>
+      <h2 id="disclosure-title">What will become public</h2>
+      <p>The score is frozen by the Agent before this link is opened. The buyer address, score,
+        payment hash, and result hash become public ERC-8004 feedback.</p>
+      <dl class="facts">
+        <dt>Prepared score</dt><dd id="score">Not loaded</dd>
+        <dt>Feedback document</dt><dd id="feedback-hash">Not loaded</dd>
+        <dt>Payment hash (public)</dt><dd id="payment-hash">Not disclosed</dd>
+        <dt>Result hash (public)</dt><dd id="output-hash">Not disclosed</dd>
+        <dt>Publication state</dt><dd id="feedback-state">Loading</dd>
+      </dl>
+      <p id="revoked-note" class="warning" hidden>This feedback is already revoked. No wallet action is available.</p>
+    </section>
+
+    <section class="card transaction-card" aria-labelledby="transaction-title">
+      <div class="section-kicker">03 · WALLET ACTION</div>
+      <h2 id="transaction-title">Review the prepared transaction</h2>
+      <p>The service identity, target, network, zero native value, full ERC-8004 calldata,
+        and gas ceiling are checked in this page before your wallet opens.</p>
+      <dl class="facts">
+        <dt>Service identity</dt><dd id="service-identity">Not loaded</dd>
+        <dt>Registry</dt><dd id="registry">Not loaded</dd>
+        <dt>Native value</dt><dd id="native-value">Not loaded</dd>
+        <dt>Gas limit</dt><dd id="gas">Not loaded</dd>
+        <dt>Network fee</dt><dd id="network-fee">Not loaded</dd>
+      </dl>
+      <div class="actions">
+        <button id="send" type="button" disabled>Send prepared feedback</button>
+      </div>
+      <p id="send-help" class="quiet-text">Choose the authorized account to continue.</p>
+    </section>
+
+    <section id="recovery-card" class="card recovery-card" aria-labelledby="recovery-title" hidden>
+      <div class="section-kicker">RECOVERY</div>
+      <h2 id="recovery-title">Verify the original transaction</h2>
+      <p id="recovery-copy">The wallet response was interrupted or a transaction is already pending. Find the original hash in your wallet and verify that transaction here. This page will never send a replacement.</p>
+      <label for="transaction-hash">Original transaction hash</label>
+      <input id="transaction-hash" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="0x…">
+      <div class="actions">
+        <button id="verify" class="quiet" type="button" disabled>Verify original transaction</button>
+      </div>
+    </section>
+
+    <section id="verified-card" class="card verified-card" aria-labelledby="verified-title" hidden>
+      <div id="verified-kicker" class="section-kicker">VERIFIED</div>
+      <h2 id="verified-title">Feedback is a verified record</h2>
+      <p id="verified-copy">The original transaction was independently verified. This page is now read-only.</p>
+      <dl class="facts">
+        <dt>Transaction</dt><dd id="verified-hash">Not available</dd>
+        <dt>Feedback index</dt><dd id="feedback-index">Not available</dd>
+        <dt>Last verification observation</dt><dd id="last-verified-at">Not available</dd>
+        <dt>Verification freshness</dt><dd id="verification-freshness">Not available</dd>
+      </dl>
+    </section>
+
+    <footer>Your wallet keeps its keys. This page only asks the selected wallet to send the prepared ERC-8004 feedback transaction.</footer>
+  </main>
+
+  <script src="/wallet_selection.js"></script>
+  <script src="/feedback.js"></script>
+</body>
+</html>

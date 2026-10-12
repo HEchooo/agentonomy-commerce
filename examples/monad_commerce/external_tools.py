@@ -19,6 +19,22 @@ def device_proxy(service, access_token):
         object_schema({'purchase_id': IDENTIFIER,
                        'csv_text': {'type': 'string', 'minLength': 1, 'maxLength': 131072}}, ['purchase_id']),
     )
+    definitions['prepare_clink_purchase_feedback'] = (
+        'feedback_prepare', 'Prepare an immutable buyer rating for your verified delivered order. Ask the user for an explicit integer score 0..100; never invent it. Open the returned wallet consent link for disclosure and signing. This tool never sends a transaction.',
+        object_schema({'purchase_id': IDENTIFIER, 'score': {'type': 'integer', 'minimum': 0, 'maximum': 100}}, ['purchase_id', 'score']),
+    )
+    definitions['get_clink_purchase_feedback'] = (
+        'feedback_status', 'Read and independently verify the original buyer feedback, including current revocation state. Never submit another feedback transaction when pending.',
+        object_schema({'purchase_id': IDENTIFIER}, ['purchase_id']),
+    )
+    definitions['verify_clink_purchase_feedback'] = (
+        'feedback_verify', 'Verify an existing wallet feedback transaction for your original delivered purchase; this does not sign or send a transaction.',
+        object_schema({'purchase_id': IDENTIFIER, 'transaction_hash': {'type': 'string', 'pattern': r'^0x[0-9a-fA-F]{64}$'}}, ['purchase_id', 'transaction_hash']),
+    )
+    definitions['get_clink_service_history'] = (
+        'service_history', 'Read verified public service history shared across buyers: delivered payments and optional buyer ratings are separate. Report sample size and verification freshness; no history means no rating. One pilot service is configured, so do not claim competing merchants or an established market.',
+        object_schema({'offering_id': IDENTIFIER}, ['offering_id']),
+    )
     descriptions = {
         'get_clink_service_details': 'Read the fixed service price and configured payment scope.',
         'create_clink_purchase_preview': 'Freeze the service input and quote under your signed spending grant.',

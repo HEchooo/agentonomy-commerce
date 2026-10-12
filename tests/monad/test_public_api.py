@@ -112,6 +112,7 @@ def test_real_rejected_wallet_hash_returns_409_and_status_allows_correction(clie
     http, runtime = client
     canary = public_canary.PublicCanary.__new__(public_canary.PublicCanary)
     canary.wallet_operations = {}
+    canary._onboarding_status = lambda: {'spending_grant_id': 'grant_current'}
     canary.operations_path = tmp_path / 'wallet-operations.json'
     canary.owner = '0x' + '44' * 20
     canary.network = SimpleNamespace(token='0x' + '11' * 20, executor='0x' + '22' * 20)

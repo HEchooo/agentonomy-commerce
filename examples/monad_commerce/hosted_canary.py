@@ -73,6 +73,30 @@ class HostedCanary(PublicCanary):
             return self.market.request('hosted', {'method': method, 'params': params})
         return self.core.hosted(method, **params)
 
+    def onboarding(self, operation, **params):
+        old_grant_id = None
+        if operation == 'grant_renew_verify':
+            old_grant_id = (self._onboarding_status() or {}).get('spending_grant_id')
+        if self.market:
+            if operation == 'onboarding_status':
+                return self._onboarding_status()
+            if operation in {
+                'grant_renew_challenge', 'grant_renew_verify',
+                'grant_challenge', 'grant_verify', 'budget_payload',
+                'budget_bind', 'allowance_verify',
+            }:
+                result = self.market.request('onboarding', {
+                    'operation': operation, **params,
+                })
+                if operation == 'grant_renew_verify' and isinstance(result, dict):
+                    self._archive_grant_generation(old_grant_id, result.get('spending_grant_id'))
+                return result
+            raise ValueError('wallet is already onboarded; no replacement grant is issued')
+        result = self.core.onboarding(operation, **params)
+        if operation == 'grant_renew_verify' and isinstance(result, dict):
+            self._archive_grant_generation(old_grant_id, result.get('spending_grant_id'))
+        return result
+
     def _start_market(self):
         if self.market:
             return

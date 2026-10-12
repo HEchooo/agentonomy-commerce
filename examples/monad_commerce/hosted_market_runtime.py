@@ -13,6 +13,9 @@ class HostedCommerceRuntime(PublicCommerceRuntime):
     def hosted(self, method, params):
         return self.core.hosted(method, **params)
 
+    def onboarding(self, operation, **params):
+        return self.core.onboarding(operation, **params)
+
     def preview_state(self, preview_id):
         preview = self.repository.get_preview(preview_id)
         if preview is None:

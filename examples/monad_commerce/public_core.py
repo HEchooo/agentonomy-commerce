@@ -86,7 +86,8 @@ VALIDITY = timedelta(days=1)
 CHALLENGE_TTL = timedelta(minutes=10)
 
 _SIGNATURE = re.compile(r"^0x[0-9a-f]{130}$")
-_STATE_VERSION = 1
+_STATE_VERSION = 2
+_LEGACY_STATE_VERSION = 1
 _STATE_KEYS = frozenset(
     {
         "version",
@@ -103,6 +104,23 @@ _STATE_KEYS = frozenset(
         "budget_binding_id",
         "allowance_id",
         "allowance_tx_hash",
+        "allowance_requires_refresh",
+        "grant_history",
+        "renewal_request",
+        "renewal_challenge",
+        "renewal_signature",
+    }
+)
+_LEGACY_STATE_KEYS = frozenset(
+    key
+    for key in _STATE_KEYS
+    if key
+    not in {
+        "allowance_requires_refresh",
+        "grant_history",
+        "renewal_request",
+        "renewal_challenge",
+        "renewal_signature",
     }
 )
 _DEPLOYMENT_KEYS = frozenset(
@@ -414,6 +432,11 @@ class ExternalWalletCore(CoreRuntime):
             "budget_binding_id": None,
             "allowance_id": None,
             "allowance_tx_hash": None,
+            "allowance_requires_refresh": False,
+            "grant_history": [],
+            "renewal_request": None,
+            "renewal_challenge": None,
+            "renewal_signature": None,
         }
 
     def _prepare_persistence(self) -> dict[str, Any]:
@@ -427,7 +450,23 @@ class ExternalWalletCore(CoreRuntime):
                 metadata = json.loads(self._metadata_path.read_text(encoding="utf-8"))
             except (OSError, UnicodeError, json.JSONDecodeError) as exc:
                 raise CorePersistenceError("persistent public Core metadata is unreadable") from exc
-            self._validate_metadata(metadata)
+            if not isinstance(metadata, dict):
+                raise CorePersistenceError("persistent public Core metadata fields are invalid")
+            if metadata.get("version") == _LEGACY_STATE_VERSION:
+                if set(metadata) != _LEGACY_STATE_KEYS:
+                    raise CorePersistenceError("persistent public Core metadata fields are invalid")
+                metadata = metadata | {
+                    "version": _STATE_VERSION,
+                    "allowance_requires_refresh": False,
+                    "grant_history": [],
+                    "renewal_request": None,
+                    "renewal_challenge": None,
+                    "renewal_signature": None,
+                }
+                self._validate_metadata(metadata)
+                _atomic_write_json(self._metadata_path, _json_value(metadata))
+            else:
+                self._validate_metadata(metadata)
             return metadata
         if database_exists or receipt_exists:
             raise CorePersistenceError("persistent public Core state requires inspection")
@@ -496,6 +535,25 @@ class ExternalWalletCore(CoreRuntime):
             metadata["budget_grant"], dict
         ):
             raise CorePersistenceError("persistent public Core budget grant is invalid")
+        if type(metadata.get("allowance_requires_refresh")) is not bool:
+            raise CorePersistenceError("persistent public Core allowance refresh flag is invalid")
+        history = metadata.get("grant_history")
+        if not isinstance(history, list) or any(not isinstance(item, dict) for item in history):
+            raise CorePersistenceError("persistent public Core grant history is invalid")
+        if metadata.get("renewal_request") is not None and not isinstance(
+            metadata["renewal_request"], dict
+        ):
+            raise CorePersistenceError("persistent public Core renewal request is invalid")
+        if metadata.get("renewal_challenge") is not None and (
+            not isinstance(metadata["renewal_challenge"], dict)
+            or set(metadata["renewal_challenge"]) != _GRANT_CHALLENGE_KEYS
+        ):
+            raise CorePersistenceError("persistent public Core renewal challenge is invalid")
+        if metadata.get("renewal_signature") is not None:
+            try:
+                _canonical_signature(metadata["renewal_signature"])
+            except ValueError as exc:
+                raise CorePersistenceError("persistent public Core renewal signature is invalid") from exc
 
     def _persist_state(self) -> None:
         self._validate_metadata(self._metadata)
@@ -514,6 +572,10 @@ class ExternalWalletCore(CoreRuntime):
             changed = True
 
         self.grant = self._recover_grant()
+        if self.grant is not None:
+            pending_renewal = self._recover_pending_renewal()
+            if pending_renewal is not None:
+                self._promote_renewed_grant(pending_renewal)
         if self.grant is not None and self._metadata.get("spending_grant_id") != self.grant.spending_grant_id:
             self._metadata["spending_grant_id"] = self.grant.spending_grant_id
             changed = True
@@ -632,6 +694,17 @@ class ExternalWalletCore(CoreRuntime):
 
     def _grant_request_has_fixed_terms(self, request: SpendingGrantRequest) -> bool:
         wallet_challenge = self._metadata.get("wallet_challenge")
+        return self._request_has_fixed_terms_for_session(
+            request,
+            wallet_challenge.get("public_account_session_id")
+            if isinstance(wallet_challenge, dict)
+            else None,
+        )
+
+    def _request_has_fixed_terms_for_session(
+        self, request: SpendingGrantRequest, public_session_id: str | None
+    ) -> bool:
+        wallet_challenge = self._metadata.get("wallet_challenge")
         return (
             request.user_id == USER_ID
             and request.wallet_identity_id == self.wallet_identity.wallet_identity_id
@@ -649,9 +722,8 @@ class ExternalWalletCore(CoreRuntime):
             and request.asset_scopes == [self.network.token]
             and request.amends_spending_grant_id is None
             and request.opc_installation is None
-            and wallet_challenge is not None
-            and request.created_by_public_account_session_id
-            == wallet_challenge["public_account_session_id"]
+            and public_session_id is not None
+            and request.created_by_public_account_session_id == public_session_id
             and request.starts_at.microsecond == 0
             and request.expires_at.microsecond == 0
             and request.expires_at - request.starts_at
@@ -662,6 +734,177 @@ class ExternalWalletCore(CoreRuntime):
         return self._grant_request_has_fixed_terms(request) and self._grant_terms_equal(
             grant, request
         )
+
+    def _renewal_challenge_session(self) -> Any:
+        challenge = self._metadata.get("renewal_challenge")
+        if challenge is None:
+            return None
+        account_session = self.repository.account_session(challenge.get("session_id"))
+        if account_session is None:
+            raise CorePersistenceError("persistent public Core renewal challenge is missing")
+        if account_session.purpose != "clink_spending_grant":
+            raise CorePersistenceError("persistent public Core renewal challenge purpose changed")
+        if self.wallet_identity is None or account_session.wallet_identity_id != self.wallet_identity.wallet_identity_id:
+            raise CorePersistenceError("persistent public Core renewal challenge identity changed")
+        payload = account_session.payload
+        if not isinstance(payload, dict) or not isinstance(payload.get("spending_grant_id"), str) or not isinstance(payload.get("terms"), dict):
+            raise CorePersistenceError("persistent public Core renewal challenge payload is invalid")
+        if account_session.payload_hash:
+            encoded = json.dumps(payload, sort_keys=True, separators=(",", ":"), ensure_ascii=True).encode("utf-8")
+            if account_session.payload_hash != "0x" + hashlib.sha256(encoded).hexdigest():
+                raise CorePersistenceError("persistent public Core renewal challenge payload changed")
+        try:
+            SpendingGrantRequest.model_validate(payload["terms"])
+        except Exception as exc:
+            raise CorePersistenceError("persistent public Core renewal challenge terms are invalid") from exc
+        return account_session
+
+    def _renewal_request(self) -> SpendingGrantRequest:
+        raw = self._metadata.get("renewal_request")
+        if not isinstance(raw, dict):
+            raise ValueError("Core grant renewal challenge has not been created")
+        session = self._renewal_challenge_session()
+        public_session_id = session.created_by_public_account_session_id
+        if not isinstance(public_session_id, str) or not public_session_id:
+            raise CorePersistenceError("persistent public Core renewal browser binding is missing")
+        return SpendingGrantRequest.model_validate(
+            raw
+            | {
+                "created_by_public_account_session_id": public_session_id,
+                "session_id": None,
+                "signed_message": None,
+                "signature": None,
+            }
+        )
+
+    def _renewal_request_has_fixed_terms(self, request: SpendingGrantRequest) -> bool:
+        session = self._renewal_challenge_session()
+        public_session_id = session.created_by_public_account_session_id if session else None
+        try:
+            challenge_request = SpendingGrantRequest.model_validate(
+                session.payload["terms"]
+            )
+        except Exception:
+            return False
+        return self._request_has_fixed_terms_for_session(request, public_session_id) and self._grant_terms_equal(
+            challenge_request, request
+        )
+
+    def _recover_pending_renewal(self):
+        if self._metadata.get("renewal_challenge") is None:
+            return None
+        if self._metadata.get("renewal_signature") is None:
+            return None
+        session = self._renewal_challenge_session()
+        new_grant_id = session.payload["spending_grant_id"]
+        new_grant = self.repository.spending_grant(new_grant_id)
+        if new_grant is None:
+            if session.consumed_at is not None:
+                raise CorePersistenceError("persistent public Core renewal outcome requires inspection")
+            return None
+        if session.consumed_at is None:
+            raise CorePersistenceError("persistent public Core renewal grant is not backed by a consumed challenge")
+        request = self._renewal_request()
+        if new_grant.wallet_identity_id != self.wallet_identity.wallet_identity_id or not self._grant_matches_renewed_request(new_grant, request):
+            raise CorePersistenceError("persistent public Core renewed spending grant terms changed")
+        return new_grant
+
+    def _grant_matches_renewed_request(self, grant: Any, request: SpendingGrantRequest) -> bool:
+        return self._renewal_request_has_fixed_terms(request) and self._grant_terms_equal(grant, request)
+
+    def _renewal_safety_check(self) -> None:
+        """Fail closed while an old payment or execution outcome is unresolved."""
+
+        terminal = {"settled", "finalized", "released"}
+        with self.funding_service.ledger.transaction() as tx:
+            rows = tx.list("reservation")
+        for row in rows:
+            if not isinstance(row, dict):
+                raise ValueError("Core grant renewal is blocked by an invalid funding record")
+            state = row.get("state")
+            if state in terminal:
+                continue
+            if state == "failed" and not any(
+                row.get(key) is not None
+                for key in (
+                    "tx_hash",
+                    "budget_attempt",
+                    "settlement_nonce",
+                    "settlement_transaction",
+                    "budget_broadcast_claimed_at",
+                    "budget_broadcasted_at",
+                    "risk_prebroadcast_state",
+                )
+            ):
+                continue
+            raise ValueError("Core grant renewal is blocked by unresolved funding state")
+
+    def _renewal_result(self) -> dict[str, Any]:
+        if self.grant is None:
+            raise CorePersistenceError("renewed Core grant is unavailable")
+        return {
+            "status": "verified",
+            "spending_grant_id": self.grant.spending_grant_id,
+            "expires_at": self.grant.expires_at.astimezone(UTC).isoformat(),
+        }
+
+    def _promote_renewed_grant(self, new_grant: Any) -> None:
+        if self.grant is None:
+            raise CorePersistenceError("previous Core grant is unavailable")
+        if new_grant.spending_grant_id == self.grant.spending_grant_id:
+            return
+        history = self._metadata.get("grant_history")
+        if not isinstance(history, list):
+            raise CorePersistenceError("persistent public Core grant history is invalid")
+        if history and history[-1].get("new_spending_grant_id") == new_grant.spending_grant_id:
+            self.grant = new_grant
+            return
+        old = {
+            "generation": len(history) + 1,
+            "archived_at": _now().astimezone(UTC).isoformat(),
+            "grant": self.grant.model_dump(mode="json"),
+            "grant_request": self._metadata.get("grant_request"),
+            "grant_challenge": self._metadata.get("grant_challenge"),
+            "grant_signature": self._metadata.get("grant_signature"),
+            "spending_grant_id": self._metadata.get("spending_grant_id"),
+            "budget_grant": self._metadata.get("budget_grant"),
+            "budget_signature": self._metadata.get("budget_signature"),
+            "budget_binding_id": self._metadata.get("budget_binding_id"),
+            "allowance_id": self._metadata.get("allowance_id"),
+            "allowance_tx_hash": self._metadata.get("allowance_tx_hash"),
+            "renewal_request": self._metadata.get("renewal_request"),
+            "renewal_challenge": self._metadata.get("renewal_challenge"),
+            "renewal_signature": self._metadata.get("renewal_signature"),
+            "new_spending_grant_id": new_grant.spending_grant_id,
+        }
+        history.append(old)
+        request = self._renewal_request()
+        challenge = self._metadata.get("renewal_challenge")
+        signature = self._metadata.get("renewal_signature")
+        if not isinstance(challenge, dict) or not isinstance(signature, str):
+            raise CorePersistenceError("persistent public Core renewal outcome is incomplete")
+        self._metadata.update(
+            {
+                "grant_request": request.terms_payload(),
+                "grant_challenge": challenge,
+                "grant_signature": signature,
+                "spending_grant_id": new_grant.spending_grant_id,
+                "budget_grant": None,
+                "budget_signature": None,
+                "budget_binding_id": None,
+                "allowance_id": None,
+                "allowance_tx_hash": None,
+                "allowance_requires_refresh": True,
+                "renewal_request": None,
+                "renewal_challenge": None,
+                "renewal_signature": None,
+                "grant_history": history,
+            }
+        )
+        self.grant = new_grant
+        self.budget_binding = None
+        self.allowance = None
+        self._persist_state()
 
     def _grant_challenge_session(self) -> Any:
         challenge = self._metadata.get("grant_challenge")
@@ -788,6 +1031,8 @@ class ExternalWalletCore(CoreRuntime):
 
     def _recover_allowance(self):
         if self.wallet_identity is None:
+            return None
+        if self._metadata.get("allowance_requires_refresh") is True:
             return None
         allowance_id = self._metadata.get("allowance_id")
         if allowance_id:
@@ -1021,6 +1266,135 @@ class ExternalWalletCore(CoreRuntime):
             "expires_at": self.grant.expires_at.astimezone(UTC).isoformat(),
         }
 
+    def _new_renewal_request(self, public_session_id: str) -> SpendingGrantRequest:
+        now = _whole_second_now()
+        return SpendingGrantRequest(
+            user_id=USER_ID,
+            wallet_identity_id=self.wallet_identity.wallet_identity_id,
+            agent_id=AGENT_ID,
+            max_amount_usdc=Decimal("1.00"),
+            per_transaction_limit_usdc=Decimal("0.50"),
+            hourly_limit_usdc=Decimal("1.00"),
+            daily_limit_usdc=Decimal("1.00"),
+            product_scopes=["marketplace"],
+            venue_scopes=[VENUE],
+            merchant_scopes=[MERCHANT_ID],
+            merchant_trust_scopes=[TRUST_TIER],
+            notification_mode="silent_under_limits",
+            network_scopes=[self.network.network],
+            asset_scopes=[self.network.token],
+            starts_at=now - timedelta(seconds=60),
+            expires_at=now + VALIDITY,
+            created_by_public_account_session_id=public_session_id,
+        )
+
+    def _renewal_public_session_id(self) -> str:
+        wallet_challenge = self._metadata.get("wallet_challenge")
+        if not isinstance(wallet_challenge, dict):
+            raise CorePersistenceError("persistent public Core wallet session is missing")
+        public_session_id = wallet_challenge.get("public_account_session_id")
+        if not isinstance(public_session_id, str) or not public_session_id:
+            raise CorePersistenceError("persistent public Core wallet session is invalid")
+        return public_session_id
+
+    def grant_renew_challenge(self) -> dict[str, Any]:
+        """Start an explicit new grant generation after a terminal grant.
+
+        Renewal never amends or resurrects the old row. The old grant, budget
+        binding and allowance evidence remain durable history, while the new
+        generation requires a new personal signature and a new EIP-712 budget
+        signature.
+        """
+
+        if self.wallet_identity is None:
+            raise ValueError("wallet identity must be verified before Core grant renewal")
+        if self.grant is None or self._phase() not in {"expired", "revoked"}:
+            raise ValueError("Core grant renewal requires a terminal grant")
+        self._renewal_safety_check()
+        existing = self._metadata.get("renewal_challenge")
+        if existing is not None:
+            try:
+                expires_at = datetime.fromisoformat(existing["expires_at"])
+            except (KeyError, TypeError, ValueError) as exc:
+                raise CorePersistenceError("persistent public Core renewal challenge expiry is invalid") from exc
+            if _now() >= expires_at.astimezone(UTC):
+                raise ValueError("Core renewal challenge expired; inspect state before retrying")
+            request = self._metadata.get("renewal_request")
+            if not isinstance(request, dict):
+                raise CorePersistenceError("persistent public Core renewal request is missing")
+            return {
+                **existing,
+                "signing_method": "personal_sign",
+                "grant_request": request,
+            }
+
+        request = self._new_renewal_request(self._renewal_public_session_id())
+        self._metadata["renewal_request"] = request.terms_payload()
+        self._persist_state()
+        challenge = self.account_service.create_spending_grant_challenge(request)
+        self._metadata["renewal_challenge"] = {
+            "session_id": challenge.session_id,
+            "message_to_sign": challenge.message_to_sign,
+            "expires_at": challenge.expires_at.astimezone(UTC).isoformat(),
+        }
+        self._persist_state()
+        return {
+            **self._metadata["renewal_challenge"],
+            "signing_method": "personal_sign",
+            "grant_request": self._metadata["renewal_request"],
+        }
+
+    def grant_renew_verify(self, signature: str | bytes) -> dict[str, Any]:
+        canonical = _canonical_signature(signature)
+        if self.grant is not None and self._phase() not in {"expired", "revoked"}:
+            # A retry after the response was lost is allowed only for the
+            # exact last generation and exact signature recorded in history.
+            history = self._metadata.get("grant_history") or []
+            if history and history[-1].get("new_spending_grant_id") == self.grant.spending_grant_id and history[-1].get("renewal_signature") == canonical:
+                return self._renewal_result()
+            raise ValueError("Core grant renewal requires a terminal grant")
+        if self.wallet_identity is None or self.grant is None:
+            raise ValueError("wallet identity and terminal Core grant are required")
+        challenge = self._metadata.get("renewal_challenge")
+        if not isinstance(challenge, dict):
+            # The process may have completed the promotion before the caller
+            # received its response; the history replay above is the only safe
+            # idempotent path in that case.
+            raise ValueError("Core grant renewal challenge has not been created")
+        if self._metadata.get("renewal_signature") not in {None, canonical}:
+            raise ValueError("Core grant renewal challenge already has a different signature")
+        try:
+            recovered = Account.recover_message(
+                encode_defunct(text=challenge["message_to_sign"]), signature=canonical
+            )
+        except (TypeError, ValueError):
+            raise ValueError("Core grant renewal signature is invalid") from None
+        if address(recovered) != self.owner_address:
+            raise ValueError("Core grant renewal signature does not match configured owner")
+        request = self._renewal_request().model_copy(
+            update={
+                "session_id": challenge["session_id"],
+                "signed_message": challenge["message_to_sign"],
+                "signature": canonical,
+            }
+        )
+        if not self._renewal_request_has_fixed_terms(request):
+            raise ValueError("Core grant renewal terms are invalid")
+        self._metadata["renewal_signature"] = canonical
+        self._persist_state()
+        try:
+            renewed = self.account_service.create_spending_grant(request)
+        except Exception:
+            renewed = self._recover_pending_renewal()
+            if renewed is None:
+                raise
+        if renewed.spending_grant_id == self.grant.spending_grant_id:
+            raise CorePersistenceError("Core grant renewal reused the previous grant")
+        if not self._grant_matches_renewed_request(renewed, request):
+            raise CorePersistenceError("Core grant renewal outcome does not match its request")
+        self._promote_renewed_grant(renewed)
+        return self._renewal_result()
+
     def _require_active_grant(self) -> Any:
         if self.grant is None:
             raise ValueError("Core spending grant has not been verified")
@@ -1123,6 +1497,8 @@ class ExternalWalletCore(CoreRuntime):
 
     def allowance_verify(self, transaction_hash: str) -> dict[str, Any]:
         canonical_tx_hash = canonicalize_transaction_hash(transaction_hash)
+        if self._metadata.get("allowance_requires_refresh") is True:
+            self.allowance = None
         if self.allowance is not None:
             if self.allowance.allowance_tx_hash != canonical_tx_hash:
                 raise ValueError("completed allowance verification rejects a different transaction")
@@ -1163,6 +1539,7 @@ class ExternalWalletCore(CoreRuntime):
         self.allowance = candidate
         self._metadata["allowance_id"] = self.allowance.asset_allowance_id
         self._metadata["allowance_tx_hash"] = self.allowance.allowance_tx_hash
+        self._metadata["allowance_requires_refresh"] = False
         self._persist_state()
         return {
             "status": "verified",

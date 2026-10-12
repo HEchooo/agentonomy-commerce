@@ -25,6 +25,8 @@ HOSTED_FIELDS = {
     'browser_authorize': {'browser_digest'},
     'browser_logout': {'browser_digest'},
     'browser_resume': {'browser_digest', 'csrf_digest'},
+    'grant_renew_challenge': {'browser_digest', 'csrf_digest'},
+    'grant_renew_verify': {'signature'},
     'opc_pair': {'proof', 'browser_digest', 'csrf_digest'},
     'opc_approve': {'browser_digest', 'csrf_digest', 'challenge_id', 'signature'},
     'opc_token': {'proof'},
@@ -131,6 +133,11 @@ class HostedCoreBridge(PublicCoreBridge):
             raise ValueError('unknown hosted authority operation')
         return self._call(method, params)
 
+    def onboarding(self, method, **params):
+        if method not in HOSTED_FIELDS and method not in SETUP_FIELDS:
+            raise ValueError('unknown wallet setup operation')
+        return self._call(method, params)
+
 
 def _core_main(state_dir):
     signer = runtime = None
@@ -207,7 +214,7 @@ def _market_main(state_dir):
                     result = {'status': 'ready', 'mode': 'monad_testnet'}
                 elif runtime is not None and method in {
                     'search', 'details', 'preview', 'preview_state', 'execute', 'purchase',
-                    'recover_purchase', 'snapshot', 'revoke', 'onboarding_status', 'hosted',
+                    'recover_purchase', 'snapshot', 'revoke', 'onboarding_status', 'onboarding', 'hosted',
                 }:
                     result = getattr(runtime, method)(**args)
                 else:

@@ -190,14 +190,19 @@ def test_browser_verification_reaches_real_canary_with_original_hash(service, op
     _, canary = service._authorize(browser, csrf, mutation=True)
     transaction_hash = '0x' + 'ab' * 32
     calls = []
-    def recorded(kind, tx_hash):
-        calls.append((kind, tx_hash))
+    def recorded(kind, tx_hash, grant_id=None):
+        calls.append((kind, tx_hash, grant_id))
         return {'verified': True, 'transaction_hash': tx_hash}
     canary._record_hash = recorded
-    canary.wallet_operations = {'revocation': {'core_revoked': True}}
+    chain_grant_id = '0x' + 'cd' * 32
+    canary._onboarding_status = lambda: {'spending_grant_id': 'grant', 'chain_grant_id': chain_grant_id}
+    canary._operation_scope = MethodType(HostedCanary._operation_scope, canary)
+    canary.wallet_operations = {'revocation': {'core_revoked': True,
+        'spending_grant_id': 'grant', 'chain_grant_id': chain_grant_id}}
     setattr(canary, operation, MethodType(getattr(HostedCanary, operation), canary))
     result = service.dispatch(browser, csrf, operation, {'transaction_hash': transaction_hash})
     assert result['verified'] is True and calls[0][1] == transaction_hash
+    assert calls[0][2] == (None if operation == 'verify_claim' else 'grant')
 
 
 def test_lost_approval_response_recovers_from_core_without_signing_again(service):

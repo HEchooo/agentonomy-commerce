@@ -40,7 +40,9 @@ Agent Gateway to request commerce; it cannot call Core or a merchant directly.
 The Agent is the user's Codex or another MCP client. A local device bridge
 connects it to the hosted MCP endpoint. The wallet site only manages wallet
 binding, spending authorization, device consent, and revocation. Service search,
-quotes, purchases, and reports stay in the Agent conversation.
+quotes, purchases, and reports stay in the Agent conversation. Buyer feedback also starts in the
+Agent conversation; a separate, temporary wallet page discloses the frozen
+rating and requests its on-chain signature.
 
 ```mermaid
 flowchart TB
@@ -57,6 +59,8 @@ flowchart TB
     M[Marketplace]
     I[Service identity guard]
     R[HTTP merchant]
+    H[Shared service history]
+    F[Verified ERC-8004 buyer feedback]
   end
 
   subgraph settlement[Core and chain settlement]
@@ -81,6 +85,12 @@ flowchart TB
   M -->|receipt + input| R
   R -->|report + output hash| M
   M -->|report + payment evidence| G --> D --> A
+  G -->|verified delivered payment + output hash| H
+  A -->|explicit buyer rating| G
+  G -.->|temporary feedback consent link| U
+  W -->|buyer signs frozen feedback| F
+  F -->|two-RPC verified evidence| H
+  H -->|delivery counts, optional ratings, sample size, freshness| G
 ```
 
 The diagram shows logical components, rather than separate operating-system
@@ -131,10 +141,13 @@ the current deployment enables one testnet rail and requires a plain EOA wallet.
 Choosing an arbitrary mainnet in a wallet does not make that network supported
 by the backend.
 
-The current hosted demo issues one finite grant per wallet. The wallet page
-cannot yet renew an expired or revoked grant, and the test-asset faucet permits
-one claim per address. Repeating onboarding with an existing wallet requires
-grant-lifecycle support; deleting its state is not a supported reset.
+Reauthorization is explicit: an expired, revoked, or exhausted grant is never
+silently extended. The user requests a new Core grant, signs its new budget,
+and approves device consent again. Previous grants, spent budgets, payment
+records, delivery recovery, and audit remain in place. Unresolved executions
+must be reconciled before switching authority. A new grant does not refill the
+wallet or clear the one-claim test faucet; remaining TestUSD and the current
+finite allowance still limit what the wallet can buy.
 
 ## Component boundaries
 
@@ -152,14 +165,42 @@ grant-lifecycle support; deleting its state is not a supported reset.
 ERC-8004 identifies the service: its owner, receiving wallet, metadata URI, and
 runtime code pins are checked before a purchase. That identity check does not
 grant the buyer a budget and does not replace Core policy or risk approval.
-ERC-8004 support covers Identity and Reputation. The underlying feedback flow
-can prepare feedback after a verified delivery; the original feedback transaction is
-verified through both RPC paths before the application exposes the feedback
-document. The public document contains the buyer address, score, payment
-transaction hash, and result output hash; it excludes the CSV payload. This flow
-has local verification and is not part of the wallet binding page; no live
-feedback acceptance is claimed. ERC-8004
-Validation and x402 are outside the implemented scope.
+ERC-8004 support covers Identity and Reputation. After a verified delivered
+order, the Agent can prepare a rating explicitly supplied by the buyer. It
+receives a temporary same-origin consent link, never a wallet transaction or
+signing credential. The authenticated buyer reviews the score, payment hash,
+and output hash in a separate wallet page and signs the fixed registry
+transaction. The binding page remains focused on account authorization.
+
+A pending or unknown feedback transaction is checked by its original hash;
+refreshing the page or asking for a new link never authorizes a second send.
+The feedback document becomes public only after independent two-RPC
+verification. It contains the buyer address, score, payment transaction hash,
+and output hash; it excludes the CSV and report. Signing feedback therefore
+explicitly publishes these transaction-linked facts.
+
+The shared service-history projection indexes verified delivered payments once
+and reads verified ERC-8004 feedback separately. Search, service details, and
+`get_clink_service_history` expose observed delivery counts, optional buyer
+rating averages, sample sizes, bounded public evidence hashes, and observation
+times across buyers. Private wallet orders, input, reports, budgets, and device
+identity remain isolated. Public hashes can be looked up on chain; this is not
+an anonymity guarantee.
+
+An observed delivery is not a positive buyer review. No reviews means a null
+rating, not a default score. Marketplace's existing operational reputation is
+kept separate from buyer ratings; its default 50 with sample size zero is not
+an earned rating. Revoked feedback is excluded when its revocation is observed
+again; a stored observation is not a promise of continuously refreshed chain
+state. A history-indexing failure returns the original paid result and can be
+repaired by querying that same order, without a replacement payment.
+
+The current pilot has one first-party service. This demonstrates the
+transaction-to-history loop, not a mature multi-merchant market or measured
+improvement in merchant selection. More independently operated services and
+reputation-informed choice are the next integration stage. ERC-8004 Validation
+and x402 are outside the implemented scope. Fresh public feedback acceptance
+still requires the buyer's wallet action; local tests are not live evidence.
 
 The main integrations are MCP for the Agent boundary, EIP-191 for wallet login,
 EIP-712 for grants and executions, ERC-8004 for service identity, and isolated
@@ -178,6 +219,7 @@ future public acceptance:
 | Monad testnet deployment | Recorded on 2026-10-08: two chain-10143 contracts and the ERC-8004 registration for Agent 2073 were deployed; two independently operated RPC paths checked the deployment, and the HTTPS registration metadata was deployed and verified. |
 | Public rollout | On 2026-10-10, release `dd3e8e8` was deployed with existing state retained. Public binding assets and registration metadata returned HTTPS 200, anonymous account access returned 401, and the isolated signer passed role/address validation and both KMS DryRuns. The unavailable secondary RPC was replaced with Ankr; both providers agreed on the finalized boundary and deployed contract hashes. No purchase was signed or broadcast during these checks. |
 | Recording preflight | On 2026-10-11, missing approved contract code-hash pins were restored and clean worker startup was fixed. Release `3b8e459` passed an isolated hosted Core startup check; public HTTPS, signer readiness, both KMS DryRuns, dual-RPC deployment checks, and Agent 2073 identity verification passed. The relevant local suites passed 714 tests. Buyer state was unchanged: TestUSD claim, authorization, purchase, and revoke remain pending. |
+| Commerce history and reauthorization | On 2026-10-13, the full Monad suite passed 732 tests and the related Core budget suite passed 21. A continuous local Anvil scenario covered two real contract payments across grant renewal, distinct revocations, original-order replay/recovery, and restart without another charge. Buyer feedback and shared history passed local boundary tests; fresh public acceptance remains pending. |
 | Fresh public own-wallet acceptance | Pending: purchase, delivery, same-order replay, revoke, and second-wallet isolation still require a new live acceptance run. |
 
 These records do not claim a complete live closed loop, production adoption, or
@@ -213,9 +255,17 @@ Once wallet consent is complete, the demonstration is:
    reconciliation service and request a preview with a stable idempotency key.
 3. Execute that preview. If payment or delivery is pending, query or recover
    the original purchase ID until its verified result is available.
-4. Execute the same `preview_id` again to show the original result and transaction hash,
-   then revoke authorization from the wallet page and show that a new purchase
-   is denied.
+4. Execute the same `preview_id` again to show the original result and transaction
+   hash. Query service history and confirm the delivery is counted only once.
+5. If the buyer chooses to rate the delivered service, use
+   `prepare_clink_purchase_feedback` with their explicit score. Open its consent
+   link, let the buyer sign, then call `get_clink_purchase_feedback` to verify
+   the original transaction and `get_clink_service_history` to read its evidence.
+   `verify_clink_purchase_feedback` can recover a known original wallet hash.
+6. Capture all purchase and feedback footage before revoking authorization.
+   Revoke from the wallet page, then show that a new purchase is denied. A later
+   run requires explicit new authorization and fresh device consent; it must
+   not revive an old preview or reset spent amounts.
 
 Only the wallet owner signs login, authorization, allowance, and revocation.
 The bridge has no AWS access; the isolated server signer receives only a fixed
@@ -227,8 +277,9 @@ deployment manifest; only the worker bootstrap omits them.
 
 Recording guides: [technical demo, up to three minutes](docs/video-technical-demo.zh-CN.md)
 and [product pitch, up to two minutes](docs/video-pitch.zh-CN.md). Use the same
-verified run for both videos and capture all purchase material before revoking
-the finite grant; the current demo cannot renew that grant for another run.
+verified run for both videos and capture all purchase and feedback material
+before revoking the finite grant. Prepare any new authorization outside the
+recorded purchase run; it requires fresh wallet signatures and device consent.
 
 ## Run locally
 

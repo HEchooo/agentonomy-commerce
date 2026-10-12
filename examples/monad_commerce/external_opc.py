@@ -17,12 +17,14 @@ import secrets
 import stat
 
 from examples.monad_commerce.hosted_service import HostedCommerceService, _digest
+from examples.monad_commerce.external_feedback import ExternalFeedbackMixin
+from examples.monad_commerce.external_history import ExternalHistoryMixin
 
 
 _BINDING_OPERATIONS = {
     'status', 'grant_challenge', 'grant_verify', 'budget_payload', 'budget_bind',
     'approval_transaction', 'verify_approval', 'claim_transaction', 'verify_claim',
-    'revoke_prepare', 'verify_revocation',
+    'revoke_prepare', 'verify_revocation', 'grant_renew_challenge', 'grant_renew_verify',
 }
 
 
@@ -41,7 +43,7 @@ def _expiry(value):
     raise ValueError('expiry unavailable')
 
 
-class ExternalHostedCommerceService(HostedCommerceService):
+class ExternalHostedCommerceService(ExternalFeedbackMixin, ExternalHistoryMixin, HostedCommerceService):
     """Browser authorization plus device-authenticated remote MCP routing."""
 
     max_devices = 128
@@ -87,6 +89,8 @@ class ExternalHostedCommerceService(HostedCommerceService):
                 );
             ''')
             self.db.commit()
+            self._init_feedback_intents()
+            self._init_service_history()
             return self
         except BaseException:
             super().__exit__(None, None, None)
@@ -337,6 +341,16 @@ class ExternalHostedCommerceService(HostedCommerceService):
     def dispatch(self, browser_token, csrf_token, operation, args):
         if operation not in _BINDING_OPERATIONS:
             raise ValueError('business operations are available only through Agent MCP')
+        if operation in {'grant_renew_challenge', 'grant_renew_verify'}:
+            fields = set() if operation == 'grant_renew_challenge' else {'signature'}
+            if type(args) is not dict or set(args) != fields:
+                raise ValueError('renewal fields outside scope')
+            with self._lock:
+                row, canary = self._authorize(browser_token, csrf_token, mutation=True)
+                if operation == 'grant_renew_challenge':
+                    return canary.onboarding(operation, browser_digest=row['browser_digest'],
+                                             csrf_digest=row['csrf_digest'])
+                return canary.onboarding(operation, signature=args['signature'])
         if operation != 'status':
             return super().dispatch(browser_token, csrf_token, operation, args)
         with self._lock:
@@ -381,6 +395,12 @@ class ExternalHostedCommerceService(HostedCommerceService):
         from examples.monad_commerce.rehearsal import public_purchase
         with self._lock:
             row, canary = self._credential(access_token)
+            if operation in {'feedback_prepare', 'feedback_status', 'feedback_verify'}:
+                return self._device_feedback(row, canary, operation, args)
+            if operation == 'service_history':
+                if set(args) != {'offering_id'}:
+                    raise ValueError('service history fields outside scope')
+                return self._service_history(args['offering_id'])
             if operation == 'status':
                 return canary.status() | {'agent_identity': self._service_identity()}
             if operation in {'preview', 'execute'}:
@@ -388,15 +408,18 @@ class ExternalHostedCommerceService(HostedCommerceService):
             if operation in {'preview', 'execute', 'purchase', 'recover_purchase'}:
                 args = args | {'opc_installation_id': row['installation_id']}
             if operation == 'execute':
-                return public_purchase(canary.request('execute', args))
+                return self._observe_purchase(row, canary, canary.request('execute', args))
             if operation == 'recover_purchase':
-                existing = canary.request('purchase', {'purchase_id': args['purchase_id']})
+                existing = canary.request('purchase', {'purchase_id': args['purchase_id'],
+                                                    'opc_installation_id': row['installation_id']})
                 if canary._verified_gate_proof(existing, args['purchase_id']) is None:
                     self._identity_guard(canary, operation, args)
-                return public_purchase(canary.request(operation, args))
+                return self._observe_purchase(row, canary, canary.request(operation, args))
             if operation not in {'search', 'details', 'preview', 'purchase'}:
                 raise ValueError('operation outside Agent MCP scope')
             value = canary.request(operation, args)
             if operation == 'purchase':
-                return public_purchase(value)
+                return self._observe_purchase(row, canary, value)
+            if operation in {'search', 'details'}:
+                return self._catalog_history(operation, value)
             return public_result('create_clink_purchase_preview', value) if operation == 'preview' else value
