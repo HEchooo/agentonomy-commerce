@@ -179,6 +179,28 @@ class ExternalHostedCommerceService(ExternalFeedbackMixin, ExternalHistoryMixin,
                 raise PermissionError('binding wallet mismatch')
         return canary
 
+    def _live_device_challenge(self, row, installation):
+        """Return whether the durable browser challenge is still usable."""
+
+        if row['status'] != 'challenge' or not row['challenge']:
+            return False
+        try:
+            challenge = json.loads(row['challenge'])
+            if type(challenge) is not dict:
+                return False
+            # The row is keyed by the device installation.  If Core includes
+            # its installation binding in the challenge, require that too.
+            if challenge.get('installation_id', installation) != installation:
+                return False
+            if (type(challenge.get('session_id')) is not str
+                or not challenge['session_id']
+                or type(challenge.get('message_to_sign')) is not str
+                or not challenge['message_to_sign']):
+                return False
+            return _expiry(challenge['expires_at']) > int(self.clock())
+        except (KeyError, TypeError, ValueError, OverflowError):
+            return False
+
     def device_request(self, action, proof):
         with self._lock:
             if action not in {'pair', 'status', 'token', 'revoke'}:
@@ -241,6 +263,22 @@ class ExternalHostedCommerceService(ExternalFeedbackMixin, ExternalHistoryMixin,
                 result = self._bound_canary(row).hosted('opc_status', proof=proof)
                 if result.get('installation_id') != installation:
                     raise PermissionError('Core device mismatch')
+                if (row['status'] == 'challenge'
+                    and result.get('status') == 'consent_required'):
+                    if self._live_device_challenge(row, installation):
+                        # Core remains authoritative about the missing
+                        # consent, while the already issued browser challenge
+                        # remains available for the owner to approve.
+                        return {'installation_id': installation, 'status': 'pending'}
+                    # An expired or malformed challenge cannot keep the UI in
+                    # a pending approval state. Clear it before reconciliation
+                    # so a later claim must obtain a fresh challenge.
+                    self.db.execute(
+                        'UPDATE external_devices SET status=?,challenge=NULL WHERE installation_id=?',
+                        ('consent_required', installation)
+                    )
+                    self.db.commit()
+                    return public_device_status(result)
                 if result.get('status') in {'active', 'revoked', 'consent_required'}:
                     # Reconcile a Core commit whose response was lost. Reading
                     # a signed device status never repeats wallet approval.

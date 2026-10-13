@@ -219,6 +219,98 @@ def test_lost_approval_response_recovers_from_core_without_signing_again(service
     assert service.binding_status(browser, request)['status'] == 'active'
 
 
+def test_reauthorization_challenge_survives_core_status_poll(service):
+    key = DeviceSigningKey.generate()
+    _, _, _ = active(service, key)
+    installation = service.device_request('status', proof(key, 'status', 'status-initial'))['installation_id']
+    DeviceCanary.devices[(OWNER_A, installation)] = 'consent_required'
+
+    assert service.device_request('status', proof(key, 'status', 'status-expired'))['status'] == 'consent_required'
+    pending = service.device_request('pair', proof(key, 'pair', 'request-reauthorize'))
+    request = pending['verification_uri'].rsplit('/', 1)[1]
+    browser, csrf = login(service, OWNER_A)
+    assert service.claim_device(browser, csrf, request)['status'] == 'claimed'
+    assert service.device_request('pair', proof(key, 'pair', 'request-challenge'))['status'] == 'pending'
+
+    status = service.device_request('status', proof(key, 'status', 'status-during-challenge'))
+    assert status['status'] == 'pending'
+    assert service.binding_status(browser, request)['status'] == 'challenge'
+    with pytest.raises(PermissionError):
+        service.device_request('token', proof(key, 'token', 'token-before-approval'))
+
+    challenge = service.binding_status(browser, request)['challenge']
+    assert service.approve_device(browser, csrf, request, challenge['session_id'], OWNER_A)['status'] == 'active'
+    assert service.device_request('token', proof(key, 'token', 'token-after-approval'))['access_token']
+
+
+def test_expired_reauthorization_challenge_fails_closed(service):
+    key = DeviceSigningKey.generate()
+    active(service, key)
+    installation = service.device_request('status', proof(key, 'status', 'status-initial'))['installation_id']
+    DeviceCanary.devices[(OWNER_A, installation)] = 'consent_required'
+    service.device_request('status', proof(key, 'status', 'status-expired'))
+    pending = service.device_request('pair', proof(key, 'pair', 'request-reauthorize'))
+    request = pending['verification_uri'].rsplit('/', 1)[1]
+    browser, csrf = login(service, OWNER_A)
+    service.claim_device(browser, csrf, request)
+    service.device_request('pair', proof(key, 'pair', 'request-challenge'))
+    NOW[0] += 601
+
+    status = service.device_request('status', proof(key, 'status', 'status-expired-challenge'))
+    assert status['status'] == 'consent_required'
+    row = service._device(installation)
+    assert row['status'] == 'consent_required'
+    assert row['challenge'] is None
+
+
+def test_malformed_reauthorization_challenge_fails_closed(service, monkeypatch):
+    key = DeviceSigningKey.generate()
+    active(service, key)
+    installation = service.device_request('status', proof(key, 'status', 'status-initial'))['installation_id']
+    DeviceCanary.devices[(OWNER_A, installation)] = 'consent_required'
+    service.device_request('status', proof(key, 'status', 'status-expired'))
+    original_hosted = DeviceCanary.hosted
+
+    def malformed_hosted(self, method, **params):
+        result = original_hosted(self, method, **params)
+        if method == 'opc_pair':
+            result.pop('message_to_sign')
+        return result
+
+    monkeypatch.setattr(DeviceCanary, 'hosted', malformed_hosted)
+    pending = service.device_request('pair', proof(key, 'pair', 'request-reauthorize'))
+    request = pending['verification_uri'].rsplit('/', 1)[1]
+    browser, csrf = login(service, OWNER_A)
+    service.claim_device(browser, csrf, request)
+    service.device_request('pair', proof(key, 'pair', 'request-challenge'))
+
+    status = service.device_request('status', proof(key, 'status', 'status-malformed-challenge'))
+    assert status['status'] == 'consent_required'
+    row = service._device(installation)
+    assert row['status'] == 'consent_required'
+    assert row['challenge'] is None
+
+
+def test_core_revoke_reconciles_immediately_while_reauthorization_challenge_is_open(service):
+    key = DeviceSigningKey.generate()
+    active(service, key)
+    installation = service.device_request('status', proof(key, 'status', 'status-initial'))['installation_id']
+    DeviceCanary.devices[(OWNER_A, installation)] = 'consent_required'
+    service.device_request('status', proof(key, 'status', 'status-expired'))
+    pending = service.device_request('pair', proof(key, 'pair', 'request-reauthorize'))
+    request = pending['verification_uri'].rsplit('/', 1)[1]
+    browser, csrf = login(service, OWNER_A)
+    service.claim_device(browser, csrf, request)
+    service.device_request('pair', proof(key, 'pair', 'request-challenge'))
+    DeviceCanary.devices[(OWNER_A, installation)] = 'revoked'
+
+    status = service.device_request('status', proof(key, 'status', 'status-revoked'))
+    assert status['status'] == 'revoked'
+    assert service._device(installation)['status'] == 'revoked'
+    with pytest.raises(PermissionError):
+        service.device_request('token', proof(key, 'token', 'token-revoked'))
+
+
 def test_unbound_intents_expire_without_exhausting_capacity(service):
     service.max_devices = 1
     first, second = DeviceSigningKey.generate(), DeviceSigningKey.generate()
