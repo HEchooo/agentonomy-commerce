@@ -28,32 +28,35 @@ Website: [agentonomy.xyz](https://agentonomy.xyz/) · X:
 
 Wallet authorization site: [review.agentonomy.xyz](https://review.agentonomy.xyz)
 · Monad testnet · valueless test assets. The wallet site and external MCP flow
-are deployed publicly. On 2026-10-13, a fresh owner-wallet run completed one
-0.30 TestUSD purchase and delivery on chain 10143; the payment was verified
-through two RPC observations and the same order was recovered without a second
-charge. The [public acceptance record](docs/monad/public-wallet-acceptance-20261013.md)
-contains the transaction and hash evidence. Optional buyer feedback was not
-submitted in this run and is not counted; revocation/refusal and second-wallet
-isolation remain pending.
+are deployed publicly. On 2026-10-14, release
+`71a9289bf7f8cc4d2adfc8f00177e4b6ee8a5c72` completed a verified **0.001 TestUSD**
+micro-price purchase and delivery on chain 10143; the original payment was
+recovered by its same transaction and verified through two RPC observations.
+The [micro-price acceptance record](docs/monad/public-micro-price-acceptance-20261014.md)
+contains the transaction, report hashes, assessment, and history evidence. The
+dated 0.30 TestUSD run remains historical in
+[its acceptance record](docs/monad/public-wallet-acceptance-20261013.md).
+Buyer feedback remains zero; revocation/refusal, second-wallet isolation, and
+the recording/final-submission gates remain pending.
 
 ## The concrete example
 
-The current service is CSV reconciliation. The dated public acceptance and the
-local simulated example below use the historical **0.30 test-only, valueless
-TestUSD** price. A new public Monad testnet deployment can select **0.001
-TestUSD** per report by setting the protected signer scope field
-`service_amount_atomic` to the integer `1000`. The same exact six-decimal token
-representation supports **0.0002 TestUSD** with `service_amount_atomic: 200`.
-The signer scope and its deployment/web copies must agree; there is no
-top-level or CLI price override.
+The current public service is CSV reconciliation at **0.001 TestUSD** per
+report, represented by `service_amount_atomic=1000` on the six-decimal TestUSD
+token. The 2026-10-14 public preflight completed that price through payment,
+same-order recovery, delivery, and history checks; see the
+[micro-price acceptance record](docs/monad/public-micro-price-acceptance-20261014.md).
+The signer scope and its deployment/web copies must agree; there is no top-level
+or CLI price override. The dated public 0.30 run and the local simulated example
+below are historical records, not the current public price.
 
-The historical owner authorization used by the recorded example is explicit
-and finite:
+The owner authorization used by the public runs is explicit and finite:
 
 - the wallet claims **1.00 TestUSD**;
 - the Core grant allows **1.00 total**, **0.50 per payment**, for **one day**;
 - the wallet approves **BudgetExecutor to spend up to 1.00 TestUSD**;
-- the Agent can request the historical fixed **0.30 TestUSD** quote for a report.
+- the Agent requested the current fixed **0.001 TestUSD** quote for a report;
+  the historical 0.30 quote remains documented separately.
 
 The allowance, grant, policy decision, reservation, payment proof, and delivery
 are separate records. A replay returns the original order and result instead of
@@ -273,17 +276,20 @@ future public acceptance:
 | Evidence | Status |
 | --- | --- |
 | Local behavior | Tested implementations cover budget limits, expiry, revocation, replay protection, paid-order recovery, execution isolation, and feedback verification. |
-| External Agent integration | Local checks cover device proof, browser consent, authenticated MCP transport, effective consent expiry, device-scoped execution, and wallet selection. On 2026-10-10 the external flow was deployed publicly; the configured Codex stdio bridge initialized and queried its unpaired device state against the live service. During that check, wallet consent and a live purchase were pending; the current 2026-10-13 preflight is recorded separately below. |
+| External Agent integration | Local checks cover device proof, browser consent, authenticated MCP transport, effective consent expiry, device-scoped execution, and wallet selection. On 2026-10-10 the external flow was deployed publicly; the configured Codex stdio bridge initialized and queried its unpaired device state against the live service. The 2026-10-13 0.30 run and 2026-10-14 micro-price preflight are recorded separately below. |
 | Monad testnet deployment | Recorded on 2026-10-08: two chain-10143 contracts and the ERC-8004 registration for Agent 2073 were deployed; two independently operated RPC paths checked the deployment, and the HTTPS registration metadata was deployed and verified. |
 | Public deployment preflight (historical) | Before the wallet run on 2026-10-13, the commerce release was deployed with wallet state retained. Anonymous account/status access returned 401; binding and feedback assets returned HTTPS 200 and matched the tested source. Two RPC providers agreed on the chain-10143 deployment and service identity; isolated-signer KMS DryRuns passed. A clean external MCP client listed all 11 business tools and queried search, details and shared history. This preflight did not itself execute a purchase. |
 | Public rollout | On 2026-10-10, release `dd3e8e8` was deployed with existing state retained. Public binding assets and registration metadata returned HTTPS 200, anonymous account access returned 401, and the isolated signer passed role/address validation and both KMS DryRuns. The unavailable secondary RPC was replaced with Ankr; both providers agreed on the finalized boundary and deployed contract hashes. No purchase was signed or broadcast during these checks. |
 | Recording preflight | On 2026-10-11, missing approved contract code-hash pins were restored and clean worker startup was fixed. Release `3b8e459` passed an isolated hosted Core startup check; public HTTPS, signer readiness, both KMS DryRuns, dual-RPC deployment checks, and Agent 2073 identity verification passed. The relevant local suites passed 714 tests. Buyer state was unchanged: TestUSD claim, authorization, purchase, and revoke remain pending. |
 | Commerce history and reauthorization | On 2026-10-13, 734 Monad tests, 21 Core budget tests, 101 commerce/review tests, 86 imported marketplace tests, and 6 submission checks passed. A continuous local Anvil scenario covered two real contract payments across grant renewal, distinct revocations, original-order replay/recovery, and restart without another charge. Buyer feedback and shared history passed local boundary tests. A public Marketplace startup namespace collision was reproduced and fixed in `1892f64`, with real clean-process startup regression coverage; search and details subsequently passed against the public MCP endpoint. |
-| Current public own-wallet acceptance | Run `public-rehearsal-20261013132037-9d10c5e` completed `preview_d374cffac2a8` → `purchase_d374cffac2a8` for `0.30 TestUSD` on chain `10143`. Payment [`0x97a3318a99ff9ecb4aec97aa76bc504fd63f96a44c1c5fecd7a74794347e8d00`](https://testnet.monadexplorer.com/tx/0x97a3318a99ff9ecb4aec97aa76bc504fd63f96a44c1c5fecd7a74794347e8d00) was observed in block `70692227`, with block hash `0x108776c60ded4247528020a40866a45eacae6a6d06fd456d363cf873e5bb47d2`; two RPC observations agreed with `monad_verified`, including the canonical payment hash. Delivery completed once; its output hash is `0x21701fdadede68174bf335856d9ffc101935f674513f1eddeb77995a6aeca8c2`, and the canonical report SHA-256 was independently recomputed and matched. Repeating execute for the same preview returned the same purchase, receipt, transaction and output without another charge. Budget ended at used `0.30`, reserved `0.00`, remaining `0.70`; shared history contains one verified delivery. Optional buyer feedback was not submitted in this run and is not counted. After deployment of `dec6e0a`, the consumer Agent recorded one off-chain assessment; exact assessment replay/readback and another paid-order replay preserved one delivery, one assessment, zero buyer feedback, and the same 0.30-used/0.70-remaining budget. The Agent judgment is explicitly not independently verified quality. See the [detailed acceptance record](docs/monad/public-wallet-acceptance-20261013.md). |
-| Remaining public acceptance | Pending: fresh Core and on-chain revoke with refused new purchase, second-wallet isolation, technical/pitch videos, and final form review/submission. Optional feedback remains outside the current acceptance result. |
+| Historical public own-wallet acceptance (2026-10-13) | The earlier run completed one `0.30 TestUSD` purchase, delivery, and same-order recovery. Its payment and assessment evidence remain in the [dated acceptance record](docs/monad/public-wallet-acceptance-20261013.md). |
+| Current public micro-price acceptance (2026-10-14) | Release `71a9289bf7f8cc4d2adfc8f00177e4b6ee8a5c72` completed `preview_28588c34eaa6` → `purchase_28588c34eaa6` for `0.001 TestUSD` (`1000` atomic) on chain `10143`. Payment [`0x52b462f432de970ad6d33e42f55144c38ab0d21c4bce921b30fb1f27e482e68e`](https://testnet.monadexplorer.com/tx/0x52b462f432de970ad6d33e42f55144c38ab0d21c4bce921b30fb1f27e482e68e) was observed in block `70731638`, finality block `70731719`, and recovered to the same delivered order. The detailed record contains the independent hash, budget, assessment, and history evidence. |
+| Remaining public acceptance | Pending: Core and on-chain revoke with a refused new purchase, second-wallet isolation, technical recording, publication of the existing pitch film, and final form review/submission. Optional buyer feedback remains zero and outside this acceptance result. |
 
-These records do not claim a complete live closed loop, production adoption, or
-a security audit. TestUSD has no monetary value.
+These records demonstrate the testnet purchase, delivery, and assessment loop.
+Revocation and second-wallet public acceptance remain listed separately;
+production adoption and a security audit are not claimed. TestUSD has no
+monetary value.
 
 ## Connect Codex
 

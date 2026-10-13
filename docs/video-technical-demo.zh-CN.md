@@ -11,12 +11,23 @@ make one real testnet purchase, reopen the delivered report without another
 charge, then ask one natural service-quality question so the consumer Agent can
 record a bounded off-chain assessment and read the shared service history.
 
-TestUSD has no monetary value. The current deployment target is **0.001
-TestUSD** (`service_amount_atomic=1000`), but the recording must read the amount
-from the live `create_clink_purchase_preview` response. Do not claim that a new
-public 0.001 preflight or acceptance has passed until a real run supplies that
-record. The dated 0.30 TestUSD acceptance is historical evidence and is not a
-replacement for the current quote.
+TestUSD has no monetary value. The current public price is **0.001 TestUSD**
+(`service_amount_atomic=1000`). The verified 2026-10-14 preflight completed that
+price through payment, same-order recovery, delivery, and history checks; see
+the [micro-price acceptance record](monad/public-micro-price-acceptance-20261014.md).
+The recording must still read the amount from the live
+`create_clink_purchase_preview` response. The dated 0.30 TestUSD acceptance is
+historical evidence and is not a replacement for the current quote.
+
+The preflight used one active Commerce bridge. Issuing a new installation token
+revokes older tokens. The temporary diagnostic client refreshed the token and
+invalidated the coordinating window's cached token, causing its later request
+to return `401`; do not claim multi-client coexistence. During a
+recording, keep one active Commerce bridge and no diagnostic MCP clients. Put the
+connection checks inside the DEMO window; restart its bridge only if unavailable.
+Before the take, verify readiness, service price, and identity there without
+creating a preview or purchase. No architecture or token
+service changed for this price run.
 
 ## Off-camera setup and operator checks
 
@@ -25,21 +36,31 @@ English-speaking Agent:
 
 ```text
 Use only the agentonomy_commerce MCP server and the schemas returned by its live
-tools. I authorize transmitting the explicitly fictional CSV I provide to the
+tools. Before recording, check the connection, search and read the service
+details, then check account readiness and budget. Verify the live price is
+0.001 TestUSD and the service identity is verified. Do not create a preview or
+purchase during these checks. Tell me when ready, then wait for my first prompt.
+Keep my existing spending grant and finite allowance unchanged. If the wallet
+page needs login, open the login request for me to confirm manually; do not sign
+for me. Stop if the grant or device consent has expired.
+I authorize transmitting the explicitly fictional CSV I provide to the
 first-party CSV reconciliation service. Allow at most one new purchase, and
 only after I confirm the returned quote. If that original payment is pending,
-you may reconcile it and retry delivery for the same purchase, but do not create
-another purchase or payment. Wait for my next message between each numbered
+continue checking and recovering that same purchase without asking me again.
+You may update its payment status and retry delivery, but do not create another
+purchase or payment. Wait for my next message between each numbered
 prompt below. Do not record an assessment immediately after delivery. Only
 after I ask, “Was the service any good? Would you use it again?”, automatically
 record one bounded off-chain consumer-Agent assessment from the original task,
 returned report, and observed interaction, then read service history. Do not
 publish the CSV or report.
 Speak in brief, natural beginner English. Do not replace the merchant's report
-with arithmetic in the conversation. Do not ask the user for a numeric rating or
-wallet signature. Before confirmation, stop if service identity or quote payment
-terms are missing or inconsistent. After execution, stop if payment, delivery,
-or output proof is missing or inconsistent, and show the actual state.
+with arithmetic in the conversation. Do not ask me for a numeric rating or an
+extra purchase or assessment signature. Before confirmation, stop if identity
+or quote payment terms are missing or inconsistent. After execution, a pending
+payment is not final failure: query or recover the original order up to three
+times. Stop if evidence conflicts or remains uncertain after those checks, and
+show the actual state. Never invent a delivered report or assessment.
 ```
 
 ### Technical setup before the take
@@ -51,6 +72,10 @@ or output proof is missing or inconsistent, and show the actual state.
   page yourself. Show the actual status, network, wallet binding, readiness,
   and budget fields returned by the run. Do not narrate a fixed or historical
   budget.
+- The verified preflight reused the existing budget and allowance. If a fresh
+  wallet login signature is needed, a human may complete that login step; do not
+  request a new budget signature, allowance signature, or buyer-rating signature
+  for this take. Login does not renew the grant or refill the budget.
 - Call `list_clink_business_tools` with `{}` and use its returned definitions.
   Business calls go through the actual wrapper shape:
 
@@ -71,11 +96,12 @@ or output proof is missing or inconsistent, and show the actual state.
   the user confirms the quote.
 - If identity or quote terms are missing or contradictory, stop before purchase.
   After execution, if payment or delivery proof is missing, contradictory,
-  pending without an original ID, or otherwise unknown, stop and reconcile only
-  that original payment and retry its delivery; do not open another purchase or
-  payment. For the four CSV rows below, the returned report should be checked
-  against income **255.00 USD**, expense **40.50 USD**, and net **214.50 USD**;
-  these checks never replace the returned `service_result`.
+  pending without an original ID, or otherwise unknown, continue the original
+  order query/recovery without requesting permission again. Stop only if the
+  evidence conflicts or remains unknown after bounded checks; do not open another
+  purchase or payment. For the four CSV rows below, the returned report should
+  be checked against income **255.00 USD**, expense **40.50 USD**, and net
+  **214.50 USD**; these checks never replace the returned `service_result`.
 
 ### Stop rules
 
