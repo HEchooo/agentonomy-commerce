@@ -368,6 +368,27 @@ class OpcAccountService:
                 if existing.request_fingerprint != fingerprint:
                     raise ValueError("OPC pairing request id conflicts")
                 return self._pairing_response(existing, installation)
+            if installation is not None and installation.status == "active":
+                try:
+                    self._validate_active_installation(
+                        session, installation, now=now
+                    )
+                except ValueError:
+                    installation.status = "consent_required"
+                    installation.updated_at = now
+                    _revoke_credentials(session, installation_id, now)
+                    if installation.user_id is not None:
+                        self.repository._append_account_audit(
+                            session,
+                            event_type="opc_installation_consent_required",
+                            user_id=installation.user_id,
+                            agent_id="hermes",
+                            created_at=now,
+                            payload={
+                                "installation_id": installation.installation_id,
+                                "spending_grant_id": installation.spending_grant_id,
+                            },
+                        )
             target_user_id = (
                 installation.user_id
                 if installation is not None and installation.user_id is not None
