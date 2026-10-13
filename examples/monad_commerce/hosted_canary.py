@@ -185,6 +185,8 @@ class HostedCanary(PublicCanary):
             return self.market.request(method, args)
         if existing is None:
             expires = datetime.fromisoformat(preview['expires_at'].replace('Z', '+00:00'))
+            if expires.tzinfo is None:
+                expires = expires.replace(tzinfo=UTC)
             if expires <= datetime.now(UTC):
                 raise ValueError('preview expired before payment admission')
         with self.gate.enter(self.tenant_id, purchase_id, self.owner) as lease:
