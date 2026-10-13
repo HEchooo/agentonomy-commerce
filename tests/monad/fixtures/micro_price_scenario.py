@@ -216,6 +216,19 @@ def _assert_snapshot(runtime, *, used: str, remaining: str) -> None:
 
 def _pay_and_deliver(harness: MicroPriceHarness, amount_atomic: int, price_usd: str, key: str):
     assert harness.runtime is not None and harness.chain is not None
+    catalog = harness.runtime.search("csv")
+    assert catalog["count"] == 1, catalog
+    item = catalog["items"][0]
+    assert item["price_usd"] == price_usd, catalog
+    assert item["payment"]["price_usd"] == price_usd, item
+    assert item["payment"]["amount_atomic"] == str(amount_atomic), item
+
+    details = harness.runtime.details(item["offering_id"])
+    assert details["quotes"], details
+    quote_payment = details["quotes"][0]["payment"]
+    assert quote_payment["price_usd"] == price_usd, details
+    assert quote_payment["amount_atomic"] == str(amount_atomic), details
+
     preview = harness.runtime.preview("csv-reconciliation-v1", CSV, key)
     assert preview["payment"]["amount_atomic"] == str(amount_atomic), preview
     assert preview["payment"]["price_usd"] == price_usd, preview

@@ -17,6 +17,7 @@ from typing import Any
 import httpx
 
 from clink_middleware.receipt import verify_clink_receipt
+from agentonomy_commerce.service_pricing import format_token_amount
 from examples.commerce.core_bridge import CoreBridge
 from services.marketplace_repository import MarketplaceRepository
 from services.purchase_service import PurchaseService
@@ -306,7 +307,7 @@ class CommerceRuntime:
                     "description": self.repository.active_offering(
                         offering_id
                     ).description,
-                    "price_usd": _money(payment.get("price_usd")),
+                    "price_usd": format_token_amount(payment.get("price_usd"), allow_zero=False),
                     "payment": payment,
                     "execution_mode": payload["execution_mode"],
                     "payment_capability": payload["payment_capability"],
