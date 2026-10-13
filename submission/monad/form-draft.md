@@ -39,15 +39,24 @@ Agentonomy Commerce
 
 ## One-line description
 
-Let AI agents reliably purchase services and retrieve results within user-authorized budgets.
+Let AI agents discover and purchase services within finite, revocable user-authorized budgets.
 
 ## Short description
 
-Agentonomy Commerce gives an AI agent a bounded way to buy a service and receive
-its result. The user authorizes an exact asset, merchant, spending limit and
-expiry. Core checks policy and reserves the budget; a Monad contract enforces
-the signed limits. Payment is independently verified before delivery. If
+Agentonomy is financial infrastructure for AI agents that act. Users authorize
+an exact asset, merchant, spending limit, policy and expiry; within that finite,
+revocable boundary, an Agent can discover and purchase services without a new
+per-purchase wallet signature when policy permits. Core checks identity, policy
+and budget, reserves budget before execution, and a Monad contract enforces the
+signed limits. Payment is independently verified, delivery is recorded against
+the returned output hash, and private keys stay in the user's wallet. If
 delivery is interrupted, the same paid order can recover without another charge.
+
+Verifiable payment and delivery records, together with explicitly supplied
+buyer feedback, build a service history for future selection. The current pilot
+has one first-party CSV reconciliation service; it demonstrates the
+transaction-to-history loop, while a mature multi-merchant reputation ranking
+is a future expansion.
 
 ## Problem and solution
 
@@ -63,9 +72,13 @@ signer. Core retains identity, policy, budget reservations and audit. The
 contract adds an independently enforced ceiling. Each execution is bound to one
 purchase and quote, and delivery recovery keeps the original payment identity.
 
-## What works today
+## Historical local acceptance (2026-10-07)
 
-We deployed TestUSD and AgentonomyBudgetExecutor on Monad testnet, chain 10143.
+The following is a dated local acceptance record saved with the form; it is not
+evidence of the current public deployment or a completed fresh public purchase.
+
+For that acceptance, TestUSD and AgentonomyBudgetExecutor were deployed on
+Monad testnet, chain 10143.
 An OKX owner completed wallet identity, the business mandate, an EIP-712 budget
 grant and finite 1.00 TestUSD allowance. The first purchase was initiated through
 the actual clink_node MCP and paid 0.30 TestUSD. Core and its watcher verified the
@@ -80,6 +93,18 @@ completed test uses a loopback merchant/API on the operator's machine. The
 public review website provides a separate, explicitly simulated demonstration.
 Live Core-plus-onchain revocation is implemented and locally tested; its public
 testnet owner-wallet acceptance remains to be recorded.
+
+## Public deployment preflight (2026-10-13)
+
+On 2026-10-13, the commerce release was deployed publicly with wallet state
+retained. Anonymous account and status access returned 401; binding and feedback
+assets returned HTTPS 200; a clean external MCP client listed all 11 business
+tools and queried search, service details and shared history. Two RPC providers
+agreed on the chain-10143 deployment and service identity, and both isolated
+signer KMS DryRuns passed. The buyer's budget and finite allowance were prepared,
+but fresh device consent, a new own-wallet purchase and delivery, same-order
+replay, buyer feedback signing and readback, and revocation remain pending. No
+purchase was executed or broadcast during this preflight.
 
 ## Monad integration
 
@@ -126,13 +151,14 @@ customers, revenue, partnerships or adoption metrics are claimed.
 | --- | --- |
 | Source repository | https://github.com/HEchooo/agentonomy-commerce |
 | Website | https://agentonomy.xyz/ |
-| Public review demo | https://review.agentonomy.xyz/ — simulated settlement |
+| X | https://x.com/AgentonomyXYZ |
+| Public wallet / MCP endpoint | https://review.agentonomy.xyz/ — deployed on Monad testnet; fresh own-wallet purchase acceptance pending |
 | Live acceptance | [role-session-acceptance.md](../../docs/monad/role-session-acceptance.md) |
 | Public evidence data | [public-evidence.json](public-evidence.json) |
 | Quickstart | [quickstart.md](../../docs/monad/quickstart.md) |
 | Technical video | Pending recording and actual accessible URL |
 | Pitch video | Pending recording and actual accessible URL |
-| Reviewer-accessible live Monad API | Pending; localhost is not a public endpoint |
+| Reviewer-accessible live Monad API | https://review.agentonomy.xyz/ — public wallet and MCP endpoint; fresh purchase acceptance pending |
 | Track | Trust, Identity & AI Infrastructure — selected in the saved form |
 | First-party open-source license | Pending owner choice; existing notices retained |
 
@@ -145,14 +171,18 @@ acceptance record for public-chain evidence.
 - Login, current field inspection and draft saving are complete. Recheck any
   final declarations and the current track rules before final submission.
   Deadline observed in the authenticated form: October 14, 11:59 GMT+8.
-- Publish and verify the actual Monad product's HTTPS access. Do not fill the
-  required live product field with the existing simulated review URL.
+- Verify the deployed public wallet and MCP endpoint at
+  https://review.agentonomy.xyz/ and its Monad testnet configuration. Use it for
+  the live product field only with the fresh acceptance evidence; keep local
+  simulated settlement clearly separate from live Monad evidence.
 - Add real technical and pitch video URLs after recording. Do not use placeholder
   links or substitute simulated footage for the Monad payment.
 - Confirm the first-party license choice if the current form requires an OSI
   license. Existing authorization to publish eligible code is already recorded.
-- Record owner-wallet revocation and the refusal of a new purchase while at
-  least 0.30 TestUSD remains. Querying an already-paid order should still work.
+- Capture purchase, delivery, transaction, feedback and history evidence before
+  revoking. Then revoke from the wallet and verify that a new purchase is refused
+  while at least 0.30 TestUSD remains; record any post-revoke read behavior only
+  if it is observed.
 - Verify the public repository and video access in a signed-out browser. Bind
   any downloaded source package to its actual Git commit and SHA-256 manifest.
 - Present the completed form to the user for final review before submitting.

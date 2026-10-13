@@ -2,10 +2,26 @@
 
 让 Agent 在用户授权预算内，可靠地购买服务并取得结果。
 
-Agentonomy Commerce lets an AI agent buy a service under a budget that the user
-has authorized. The system checks the quote, reserves the budget, verifies the
-payment independently, asks the merchant to validate the receipt, and returns
-the result to the user. The user never gives the Agent a private key.
+Agentonomy is financial infrastructure for AI agents that act.
+
+Users authorize a finite, revocable spending boundary: the asset, limits,
+policy, payee, and expiry are explicit. Within that boundary, an Agent can
+discover services in a Marketplace and purchase them without a new per-purchase
+wallet signature when the policy permits. Every request is checked for identity,
+budget, and policy; budget is reserved before execution; payment is independently
+verified, delivery is recorded against the returned output hash, and the user
+receives a clear receipt. Private keys stay in the user's wallet and are never
+held by the Agent.
+
+Verifiable payment and delivery records, together with explicitly supplied
+buyer feedback, build a service history that can help future Agents choose
+between providers. The current pilot has one first-party CSV reconciliation
+service, demonstrating the transaction-to-history loop. A multi-merchant market
+with reputation-informed selection is the next integration stage.
+
+Website: [agentonomy.xyz](https://agentonomy.xyz/) · X:
+[@AgentonomyXYZ](https://x.com/AgentonomyXYZ) · Docs / source:
+[github.com/HEchooo/agentonomy-commerce](https://github.com/HEchooo/agentonomy-commerce)
 
 Wallet authorization site: [review.agentonomy.xyz](https://review.agentonomy.xyz)
 · Monad testnet · valueless test assets. The wallet site and external MCP flow
@@ -165,9 +181,10 @@ finite allowance still limit what the wallet can buy.
 ERC-8004 identifies the service: its owner, receiving wallet, metadata URI, and
 runtime code pins are checked before a purchase. That identity check does not
 grant the buyer a budget and does not replace Core policy or risk approval.
-ERC-8004 support covers Identity and Reputation. After a verified delivered
-order, the Agent can prepare a rating explicitly supplied by the buyer. It
-receives a temporary same-origin consent link, never a wallet transaction or
+ERC-8004 support covers Identity and Reputation. After a delivered order with
+verified payment and an output hash, the Agent can prepare a rating explicitly
+supplied by the buyer. It receives a temporary same-origin consent link, never
+a wallet transaction or
 signing credential. The authenticated buyer reviews the score, payment hash,
 and output hash in a separate wallet page and signs the fixed registry
 transaction. The binding page remains focused on account authorization.
@@ -179,8 +196,9 @@ verification. It contains the buyer address, score, payment transaction hash,
 and output hash; it excludes the CSV and report. Signing feedback therefore
 explicitly publishes these transaction-linked facts.
 
-The shared service-history projection indexes verified delivered payments once
-and reads verified ERC-8004 feedback separately. Search, service details, and
+The shared service-history projection indexes verified payment and delivery
+records once and reads verified ERC-8004 feedback separately. Search, service
+details, and
 `get_clink_service_history` expose observed delivery counts, optional buyer
 rating averages, sample sizes, bounded public evidence hashes, and observation
 times across buyers. Private wallet orders, input, reports, budgets, and device
