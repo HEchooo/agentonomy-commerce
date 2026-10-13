@@ -302,6 +302,42 @@ def test_review_merchant_binds_a_logical_resource_while_serving_loopback(tmp_pat
     assert loopback_endpoint.startswith("http://127.0.0.1:")
 
 
+def test_review_merchant_health_is_public_scope_only_and_exact_path(tmp_path: Path):
+    with ReviewMerchant(
+        tmp_path,
+        receipt_secret=SECRET,
+        network=NETWORK,
+        token=TOKEN,
+        pay_to=PAY_TO,
+        port=0,
+        resource="https://merchant.agentonomy.invalid/v1/reconcile",
+    ) as merchant:
+        health_url = merchant.endpoint.replace("/v1/reconcile", "/health")
+        response = httpx.get(health_url, timeout=5, trust_env=False)
+
+        assert response.status_code == 200
+        assert response.json() == {
+            "status": "ready",
+            "merchant_id": merchant.merchant_id,
+            "network": NETWORK,
+            "token": TOKEN,
+            "pay_to": PAY_TO,
+            "resource": merchant.receipt_resource,
+        }
+        assert SECRET not in response.text
+        assert "receipt_secret" not in response.text
+        assert "state" not in response.text
+        assert "input" not in response.text
+
+        for path in ("/health/", "/health?secret=should-not-be-read", "/"):
+            rejected = httpx.get(
+                merchant.endpoint.replace("/v1/reconcile", path),
+                timeout=5,
+                trust_env=False,
+            )
+            assert rejected.status_code == 404
+
+
 def test_review_merchant_rejects_tampered_receipts_and_body_reuse(tmp_path: Path):
     csv_text = _csv("t-1,2026-09-01,Payment,1.00,USD,income")
     other_csv = _csv("t-1,2026-09-01,Payment,2.00,USD,income")

@@ -86,6 +86,7 @@ class BudgetCommerceRuntime(ReviewRuntime):
                 network=self._network, token=self._asset, pay_to=self._pay_to,
                 port=self.merchant_port, expected_input_hash=self._expected_input_hash,
                 resource=RESOURCE,
+                settlement_mode=snapshot['mode'],
             )
             self.merchant.__enter__()
             self.provider, self.offerings = self._register_catalog()

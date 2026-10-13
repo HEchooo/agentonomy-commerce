@@ -2,6 +2,13 @@
 import hmac
 from agentonomy_commerce.merchant import ReviewMerchant, reconcile_csv, _MerchantRequestError, _MerchantHandler
 class BudgetMerchant(ReviewMerchant):
+    def __init__(self, *args, settlement_mode="local_anvil", **kwargs):
+        super().__init__(*args, **kwargs)
+        networks = {"local_anvil": "eip155:31337", "monad_testnet": "eip155:10143"}
+        if settlement_mode not in networks or self.network != networks[settlement_mode]:
+            raise ValueError("merchant settlement mode does not match its network")
+        self.settlement_mode = settlement_mode
+
     def _handle_post(self, handler: _MerchantHandler) -> None:
         try:
             purchase_id, csv_text, input_hash = self._read_request(handler)
@@ -23,7 +30,7 @@ class BudgetMerchant(ReviewMerchant):
                 "purchase_id": purchase_id,
                 "input_hash": input_hash,
                 "real_funds": False,
-                "settlement_mode": "local_anvil",
+                "settlement_mode": self.settlement_mode,
             }
             stored_result = self._store_result(purchase_id, input_hash, payload)
             handler._send(200, stored_result)

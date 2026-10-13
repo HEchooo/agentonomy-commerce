@@ -193,6 +193,8 @@ class CommerceRuntime:
                 "Core snapshot missing required setup fields: " + ", ".join(missing)
             )
         values = {key: snapshot[key] for key in required}
+        if "mode" in snapshot:
+            values["mode"] = snapshot["mode"]
         for key, value in values.items():
             if not isinstance(value, str) or not value.strip():
                 raise RuntimeError(f"Core snapshot field {key} is invalid")

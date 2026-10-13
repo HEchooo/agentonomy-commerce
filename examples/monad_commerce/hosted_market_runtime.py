@@ -1,8 +1,19 @@
 """Marketplace-only process adapter; Core remains behind its private pipe."""
+from datetime import UTC, datetime
+from urllib.parse import urlsplit
+
+import httpx
+
 from agentonomy_commerce.runtime import ReviewRuntime
 from examples.monad_commerce.public_runtime import PublicCommerceRuntime
 from examples.monad_commerce.hosted_process import HostedCoreBridge
-from agentonomy_commerce.runtime import OFFERING_ID, USER_ID, reconcile_csv, digest
+from agentonomy_commerce.runtime import OFFERING_ID, RESOURCE, USER_ID, reconcile_csv, digest
+from storage.tables import OfferingRow
+
+
+_FIRST_PARTY_PROVIDER_ID = "commerce_analytics"
+_MERCHANT_RECONCILE_PATH = "/v1/reconcile"
+_MERCHANT_HEALTH_PATH = "/health"
 
 
 class HostedCommerceRuntime(PublicCommerceRuntime):
@@ -15,6 +26,97 @@ class HostedCommerceRuntime(PublicCommerceRuntime):
 
     def onboarding(self, operation, **params):
         return self.core.onboarding(operation, **params)
+
+    @staticmethod
+    def _health_endpoint(endpoint):
+        if not isinstance(endpoint, str):
+            raise ValueError("merchant endpoint is invalid")
+        parsed = urlsplit(endpoint)
+        try:
+            port = parsed.port
+        except ValueError as exc:
+            raise ValueError("merchant endpoint is invalid") from exc
+        if (
+            parsed.scheme != "http"
+            or parsed.hostname != "127.0.0.1"
+            or parsed.username is not None
+            or parsed.password is not None
+            or parsed.query
+            or parsed.fragment
+            or parsed.path != _MERCHANT_RECONCILE_PATH
+            or not isinstance(port, int)
+            or not 1 <= port <= 65535
+            or parsed.netloc != f"127.0.0.1:{port}"
+        ):
+            raise ValueError("merchant endpoint is invalid")
+        return f"http://127.0.0.1:{port}{_MERCHANT_HEALTH_PATH}"
+
+    def _refresh_first_party_catalog(self):
+        try:
+            if self.provider is None or self.provider.provider_id != _FIRST_PARTY_PROVIDER_ID:
+                raise ValueError("first-party provider is invalid")
+            if len(self.offerings) != 1:
+                raise ValueError("first-party catalog is ambiguous")
+            offering = self.offerings[0]
+            if (
+                offering.offering_id != OFFERING_ID
+                or offering.provider_id != _FIRST_PARTY_PROVIDER_ID
+                or offering.endpoint != RESOURCE
+                or len(offering.payment_options) != 1
+            ):
+                raise ValueError("first-party offering is invalid")
+            payment = offering.payment_options[0]
+            if (
+                payment.network != self._network
+                or payment.asset != self._asset
+                or payment.pay_to != self._pay_to
+            ):
+                raise ValueError("first-party payment scope is invalid")
+
+            health_endpoint = self._health_endpoint(self.merchant.endpoint)
+            response = httpx.get(
+                health_endpoint,
+                timeout=2.0,
+                trust_env=False,
+                follow_redirects=False,
+            )
+            if response.status_code != 200:
+                raise ValueError("merchant health is unavailable")
+            health = response.json()
+            expected = {
+                "status": "ready",
+                "merchant_id": _FIRST_PARTY_PROVIDER_ID,
+                "network": self._network,
+                "token": self._asset,
+                "pay_to": self._pay_to,
+                "resource": RESOURCE,
+            }
+            if type(health) is not dict or health != expected:
+                raise ValueError("merchant health scope is invalid")
+
+            checked_at = datetime.now(UTC)
+            expected_payload = offering.model_dump(mode="json")
+            with self.repository.sessions.begin() as session:
+                row = session.get(OfferingRow, OFFERING_ID)
+                if (
+                    row is None
+                    or row.provider_id != _FIRST_PARTY_PROVIDER_ID
+                    or row.status != "verified"
+                    or row.candidate_payload is not None
+                    or row.payload != expected_payload
+                ):
+                    raise ValueError("first-party catalog row is not the startup snapshot")
+                row.last_verified_at = checked_at
+        except Exception:
+            raise RuntimeError("merchant unavailable") from None
+
+    def search(self, query=""):
+        self._refresh_first_party_catalog()
+        return super().search(query)
+
+    def details(self, offering_id):
+        self._refresh_first_party_catalog()
+        return super().details(offering_id)
 
     def preview_state(self, preview_id):
         preview = self.repository.get_preview(preview_id)

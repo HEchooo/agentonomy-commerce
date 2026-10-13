@@ -291,6 +291,20 @@ class _MerchantHandler(BaseHTTPRequestHandler):
         self.server.merchant._handle_post(self)  # type: ignore[attr-defined]
 
     def do_GET(self) -> None:  # noqa: N802 - BaseHTTPRequestHandler API
+        if self.path == "/health":
+            merchant = self.server.merchant  # type: ignore[attr-defined]
+            self._send(
+                200,
+                {
+                    "status": "ready",
+                    "merchant_id": merchant.merchant_id,
+                    "network": merchant.network,
+                    "token": merchant.token,
+                    "pay_to": merchant.pay_to,
+                    "resource": merchant.receipt_resource,
+                },
+            )
+            return
         self._send(404, {"error": "not_found"})
 
     def do_PUT(self) -> None:  # noqa: N802 - BaseHTTPRequestHandler API
