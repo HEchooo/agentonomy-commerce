@@ -37,7 +37,7 @@ and report contents remain private.
 ## Budget, nonce, and delivery counters
 
 The budget projection changed from used `0.90` to `0.901` TestUSD. Reserved
-amount remained `0`; remaining budget changed from `0.100` to `0.099` TestUSD.
+amount remained `0`; remaining budget changed from `0.10` to `0.099` TestUSD.
 The relayer nonce changed from `9` to `10`; this is a nonce transition, not a
 payment count. The observed delivery count changed from `3` to `4`.
 
@@ -106,4 +106,3 @@ The following gates remain outside this acceptance record:
 - optional buyer feedback with an explicit wallet action;
 - technical recording, publication of the existing pitch film, final form
   review, and submission.
-
