@@ -19,6 +19,7 @@ import stat
 from examples.monad_commerce.hosted_service import HostedCommerceService, _digest
 from examples.monad_commerce.external_feedback import ExternalFeedbackMixin
 from examples.monad_commerce.external_history import ExternalHistoryMixin
+from examples.monad_commerce.operation_diagnostics import capture_device_operation_failure
 
 
 _BINDING_OPERATIONS = {
@@ -390,6 +391,7 @@ class ExternalHostedCommerceService(ExternalFeedbackMixin, ExternalHistoryMixin,
             row, _ = self._credential(access_token)
             return HostedMcpPrincipal(row['tenant_id'], row['owner'], device_proxy(self, access_token))
 
+    @capture_device_operation_failure
     def device_operation(self, access_token, operation, args):
         from examples.commerce.node import public_result
         from examples.monad_commerce.rehearsal import public_purchase

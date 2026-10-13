@@ -17,6 +17,7 @@ for source in (ROOT / 'apps/marketplace', ROOT / 'apps/node', ROOT / 'apps/core'
         sys.path.insert(0, str(source))
 from examples.monad_commerce.public_bridge import PublicCoreBridge
 from examples.monad_commerce.public_worker import validate_bootstrap
+from examples.monad_commerce.operation_diagnostics import log_operation_failure
 
 
 HOSTED_FIELDS = {
@@ -250,7 +251,11 @@ def _market_main(state_dir):
                 response = {'id': request['id'], 'result': result}
             except KeyError:
                 response = {'id': request['id'], 'error': 'purchase_not_found' if method == 'purchase' else 'item_not_found'}
-            except Exception:
+            except Exception as exc:
+                try:
+                    log_operation_failure(method, exc)
+                except Exception:
+                    pass
                 response = {'id': request['id'], 'error': 'Operation unconfirmed; query original order'}
             print(json.dumps(response, default=str), flush=True)
     finally:
