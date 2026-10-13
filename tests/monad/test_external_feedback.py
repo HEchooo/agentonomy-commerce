@@ -1,6 +1,7 @@
 """External Agent feedback is routed by device, then signed by its own buyer."""
 from copy import deepcopy
 import json
+from types import SimpleNamespace
 from urllib.parse import urlsplit
 
 import pytest
@@ -28,6 +29,29 @@ class FeedbackCanary(DeviceCanary):
         self.tenant_id = kwargs['tenant_id']
         self.orders = self.orders_by_owner.setdefault(self.owner, {})
         self.authorized = self.auth_by_owner.setdefault(self.owner, set())
+        # HostedCanary's receipt gate reads the immutable preview through the
+        # market client.  Keep that internal lookup off ``calls`` so the
+        # device-call assertions below continue to cover only device traffic.
+        self.market = SimpleNamespace(request=self._preview_state)
+
+    def _preview_state(self, method, args):
+        if method != 'preview_state':
+            raise AssertionError(method)
+        preview_id = args.get('preview_id')
+        for item in self.orders.values():
+            purchase = item.get('purchase', {})
+            if purchase.get('preview_id') == preview_id:
+                return {
+                    'preview_id': preview_id,
+                    'payment': {
+                        'price_usd': '0.30',
+                        'amount_atomic': '300000',
+                        'network': 'eip155:10143',
+                        'asset': self.network.token,
+                        'pay_to': self.network.payee,
+                    },
+                }
+        raise KeyError(preview_id)
 
     def request(self, method, args):
         self.calls.append((method, deepcopy(args)))

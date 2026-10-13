@@ -15,6 +15,7 @@ from examples.commerce.node import MarketplaceBridge
 from examples.monad_commerce.public_bridge import PublicCoreBridge
 from examples.monad_commerce.public_worker import validate_bootstrap
 from scripts.monad.preflight import inspect_configuration
+from agentonomy_commerce.service_pricing import atomic_price_terms
 
 
 class PublicCanary:
@@ -27,6 +28,9 @@ class PublicCanary:
                           'signer_configuration': configuration['signer_configuration']}
         scope = validate_bootstrap(self.bootstrap)
         self.network, self.owner = scope.network, scope.owner
+        self._service_payment_terms = atomic_price_terms(
+            getattr(scope, "service_amount_atomic", 300000)
+        )
         self.state_dir = Path(state_dir).expanduser().resolve()
         self.core = self.market = self.lock = None
         self.wallet_operations = {}
@@ -76,11 +80,15 @@ class PublicCanary:
     def status(self):
         onboarding = self._onboarding_status()
         commerce = self.market.request('snapshot') if self.market else None
+        service_payment_terms = getattr(
+            self, "_service_payment_terms", atomic_price_terms(300000)
+        )
         return {'owner': self.owner, 'chain_id': self.network.chain_id,
                 'token': self.network.token, 'executor': self.network.executor,
                 'payee': self.network.payee, 'mode': self.network.mode,
                 'token_symbol': 'TestUSD', 'simulation': False, 'real_funds': False,
-                'terms': {'total': '1.00', 'per_payment': '0.50', 'price': '0.30'},
+                'terms': {'total': '1.00', 'per_payment': '0.50',
+                          'price': service_payment_terms['price_usd']},
                 'onboarding': onboarding, 'commerce': commerce,
                 'wallet_operations': self.wallet_operations}
 

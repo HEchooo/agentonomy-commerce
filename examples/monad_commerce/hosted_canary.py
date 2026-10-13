@@ -8,6 +8,7 @@ from eth_abi import decode
 from eth_utils import keccak
 
 from agentonomy_commerce.budget_network import RpcClient
+from agentonomy_commerce.service_pricing import payment_terms
 from agentonomy_commerce.wallet_transactions import verify_wallet_transaction
 from examples.commerce.node import MarketplaceBridge
 from examples.commerce.core_persistence import _atomic_write_json
@@ -116,7 +117,7 @@ class HostedCanary(PublicCanary):
             self.market = None
             raise
 
-    def _verified_gate_proof(self, result, purchase_id):
+    def _verified_gate_proof(self, result, purchase_id, *, preview=None):
         evidence = result.get('settlement') or {}
         if result.get('purchase_id') != purchase_id:
             raise ValueError('payment result belongs to another order')
@@ -135,13 +136,27 @@ class HostedCanary(PublicCanary):
             or evidence.get('payee') != self.network.payee
             or evidence.get('executor') != self.network.executor
             or evidence.get('owner') != self.owner
-            or str(evidence.get('amount_atomic')) != '300000'
             or not evidence.get('purchase_commitment')
             or not evidence.get('quote_commitment')
             or not evidence.get('grant_hash')
             or not evidence.get('block_hash')
             or not evidence.get('finality_block_hash')):
             raise ValueError('canonical Core payment evidence is incomplete')
+        # The current catalog may have changed since this order was paid.
+        # Validate against its frozen preview, never reprice a historical receipt.
+        preview_id = 'preview_' + purchase_id.removeprefix('purchase_')
+        if preview is None:
+            preview = self.market.request('preview_state', {'preview_id': preview_id})
+        payment = preview.get('payment') if isinstance(preview, dict) else None
+        if (not isinstance(preview, dict) or preview.get('preview_id') != preview_id
+            or not isinstance(payment, dict)
+            or payment.get('network') != 'eip155:10143'
+            or payment.get('asset') != self.network.token
+            or payment.get('pay_to') != self.network.payee):
+            raise ValueError('canonical Core payment preview is incomplete')
+        expected_price = payment_terms(payment)
+        if str(evidence.get('amount_atomic')) != expected_price['amount_atomic']:
+            raise ValueError('canonical Core payment amount differs from frozen preview')
         return {
             'tenant_id': self.tenant_id, 'purchase_id': purchase_id, 'owner': self.owner,
             'verified': True, 'two_rpc_verified': evidence.get('two_rpc_verified'),
@@ -179,7 +194,7 @@ class HostedCanary(PublicCanary):
             if str(exc) != 'purchase_not_found':
                 raise
             existing = None
-        completed_proof = self._verified_gate_proof(existing, purchase_id) if existing is not None else None
+        completed_proof = self._verified_gate_proof(existing, purchase_id, preview=preview) if existing is not None else None
         if completed_proof:
             self.gate.reconcile_verified_payment(completed_proof)
             return self.market.request(method, args)
@@ -191,7 +206,7 @@ class HostedCanary(PublicCanary):
                 raise ValueError('preview expired before payment admission')
         with self.gate.enter(self.tenant_id, purchase_id, self.owner) as lease:
             result = self.market.request(method, args)
-            proof = self._verified_gate_proof(result, purchase_id)
+            proof = self._verified_gate_proof(result, purchase_id, preview=preview)
             if proof:
                 lease.complete_verified_payment(proof)
             elif result.get('state') not in {'payment_submitted', 'paid_but_undelivered'}:

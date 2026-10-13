@@ -24,6 +24,7 @@ class SigningScope:
     relayer_address: str
     nonce_min: int
     nonce_max: int
+    service_amount_atomic: int = 300000
 
     def __post_init__(self):
         for field in ('owner', 'execution_address', 'relayer_address'):
@@ -36,11 +37,13 @@ class SigningScope:
             or not 0 <= self.nonce_min <= self.nonce_max < 2**64
             or self.nonce_max - self.nonce_min > 8):
             raise ValueError('bounded nonce range required')
+        if type(self.service_amount_atomic) is not int or not 1 <= self.service_amount_atomic <= 500000:
+            raise ValueError('bounded positive service amount required')
 
     @classmethod
     def from_json(cls, value):
         expected = {'network', 'owner', 'execution_address', 'relayer_address', 'nonce_min', 'nonce_max'}
-        if not isinstance(value, dict) or set(value) != expected:
+        if not isinstance(value, dict) or set(value) not in (expected, expected | {'service_amount_atomic'}):
             raise ValueError('invalid signing scope')
         return cls(**(value | {'network': NetworkConfig(**value['network'])}))
 
@@ -67,7 +70,7 @@ class ScopedSigner:
         now = int(time.time())
         if not grant.valid_after <= now < execution.deadline <= min(now + 120, grant.valid_until):
             raise ValueError('execution outside authorized time window')
-        if execution.amount != 300000 or execution.amount > grant.max_per_payment:
+        if execution.amount != scope.service_amount_atomic or execution.amount > grant.max_per_payment:
             raise ValueError('execution differs from fixed service price')
         if execution.grant_hash != '0x' + hash_grant(grant, network.chain_id, network.executor).hex():
             raise ValueError('execution grant commitment mismatch')

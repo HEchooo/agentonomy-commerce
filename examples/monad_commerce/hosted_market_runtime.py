@@ -18,6 +18,7 @@ _MERCHANT_HEALTH_PATH = "/health"
 
 class HostedCommerceRuntime(PublicCommerceRuntime):
     def __init__(self, state_dir, merchant_port, bootstrap):
+        self._configure_service_price(bootstrap)
         ReviewRuntime.__init__(self, state_dir, merchant_port)
         self.core = HostedCoreBridge(self.state_dir, bootstrap)
 

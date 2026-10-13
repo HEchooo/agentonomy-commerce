@@ -26,6 +26,7 @@ import time
 from typing import Any, Callable
 
 from clink_middleware.receipt import verify_clink_receipt
+from agentonomy_commerce.service_pricing import payment_terms
 
 
 _CSV_COLUMNS = (
@@ -351,6 +352,7 @@ class ReviewMerchant:
         port: int,
         resource: str | None = None,
         expected_input_hash: Callable[[str], str | None] | None = None,
+        expected_payment: Callable[[str], Any] | None = None,
     ) -> None:
         if not isinstance(state_dir, Path):
             state_dir = Path(state_dir)
@@ -367,6 +369,8 @@ class ReviewMerchant:
             raise ValueError("port must be between 0 and 65535")
         if expected_input_hash is not None and not callable(expected_input_hash):
             raise ValueError("expected_input_hash must be callable")
+        if expected_payment is not None and not callable(expected_payment):
+            raise ValueError("expected_payment must be callable")
 
         self.state_dir = state_dir.expanduser().resolve()
         self.receipt_secret = receipt_secret
@@ -376,6 +380,7 @@ class ReviewMerchant:
         self.port = port
         self.resource = resource.strip() if isinstance(resource, str) and resource.strip() else None
         self.expected_input_hash = expected_input_hash
+        self.expected_payment = expected_payment
         self._server: _MerchantHTTPServer | None = None
         self._thread: threading.Thread | None = None
         self._started = threading.Event()
@@ -598,6 +603,22 @@ class ReviewMerchant:
             )
         return value
 
+    def _expected_payment(self, purchase_id: str) -> dict[str, str]:
+        callback = self.expected_payment
+        if callback is None:
+            return payment_terms({"price_usd": "0.30", "amount_atomic": "300000"})
+        try:
+            value = callback(purchase_id)
+            if value is None:
+                raise ValueError("payment terms are unavailable")
+            return payment_terms(value)
+        except Exception as exc:
+            raise _MerchantRequestError(
+                503,
+                "payment_terms_unavailable",
+                "Core payment terms are unavailable",
+            ) from exc
+
     def _verify_receipt(self, token: str, purchase_id: str) -> dict[str, Any]:
         try:
             receipt = verify_clink_receipt(
@@ -611,6 +632,7 @@ class ReviewMerchant:
             scope = receipt.get("metadata", {}).get("receipt_scope")
             if not isinstance(scope, dict):
                 raise ValueError("signed receipt scope is missing")
+            expected_payment = self._expected_payment(purchase_id)
             expected_scope = {
                 "merchant_id": self.merchant_id,
                 "resource": self.receipt_resource,
@@ -618,8 +640,8 @@ class ReviewMerchant:
                 "chain": self.network,
                 "token_address": self.token,
                 "pay_to": self.pay_to,
-                "amount_usdc": "0.30",
-                "amount_atomic": "300000",
+                "amount_usdc": expected_payment["price_usd"],
+                "amount_atomic": expected_payment["amount_atomic"],
                 "status": "settled",
             }
             for name, expected in expected_scope.items():
@@ -641,9 +663,12 @@ class ReviewMerchant:
                 raise ValueError("receipt token address mismatch")
             if not _same_evm_address(receipt.get("destination"), self.pay_to):
                 raise ValueError("receipt payee mismatch")
-            if not _exact_amount(receipt.get("amount_usdc"), "0.30"):
+            if not _exact_amount(receipt.get("amount_usdc"), expected_payment["price_usd"]):
                 raise ValueError("receipt price mismatch")
-            if receipt.get("amount_atomic") not in {None, "300000"}:
+            if receipt.get("amount_atomic") not in {
+                None,
+                expected_payment["amount_atomic"],
+            }:
                 raise ValueError("receipt atomic amount mismatch")
             return receipt
         except _MerchantRequestError:

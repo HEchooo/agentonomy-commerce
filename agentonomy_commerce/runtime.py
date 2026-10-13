@@ -8,6 +8,7 @@ import httpx
 
 from agentonomy_commerce.merchant import ReviewMerchant, reconcile_csv
 from agentonomy_commerce.storage import SQLiteStore
+from agentonomy_commerce.service_pricing import payment_terms
 from agentonomy_commerce.transport import LoopbackMerchantTransport
 from examples.commerce.core_bridge import CoreBridge
 from examples.commerce.marketplace import CommerceRuntime, USER_ID
@@ -40,6 +41,7 @@ class ReviewRuntime(CommerceRuntime):
                 self.state_dir / "merchant", receipt_secret=self._receipt_signing_key,
                 network=self._network, token=self._asset, pay_to=self._pay_to,
                 port=self.merchant_port, expected_input_hash=self._expected_input_hash,
+                expected_payment=self._expected_payment,
                 resource=RESOURCE,
             )
             self.merchant.__enter__()
@@ -76,6 +78,20 @@ class ReviewRuntime(CommerceRuntime):
     def _expected_input_hash(self, purchase_id):
         purchase = self.repository.get_purchase(purchase_id)
         return purchase.input_hash if purchase is not None else None
+
+    def _expected_payment(self, purchase_id):
+        purchase = self.repository.get_purchase(purchase_id)
+        if purchase is None or purchase.purchase_id != purchase_id:
+            return None
+        preview = self.repository.get_preview(purchase.preview_id)
+        if preview is None or any(
+            getattr(purchase, field) != getattr(preview, field)
+            for field in ('preview_id', 'user_id', 'offering_id', 'input_hash')
+        ):
+            return None
+        if digest(preview.payment) != preview.quote_hash:
+            return None
+        return payment_terms(preview.payment)
 
     def _register_catalog(self):
         provider = Provider(

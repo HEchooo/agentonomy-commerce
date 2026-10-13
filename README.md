@@ -38,18 +38,33 @@ isolation remain pending.
 
 ## The concrete example
 
-The current service is CSV reconciliation. It costs **0.30 test-only,
-valueless TestUSD** per report. The owner authorization used by the example is
-explicit and finite:
+The current service is CSV reconciliation. The dated public acceptance and the
+local simulated example below use the historical **0.30 test-only, valueless
+TestUSD** price. A new public Monad testnet deployment can select **0.001
+TestUSD** per report by setting the protected signer scope field
+`service_amount_atomic` to the integer `1000`. The same exact six-decimal token
+representation supports **0.0002 TestUSD** with `service_amount_atomic: 200`.
+The signer scope and its deployment/web copies must agree; there is no
+top-level or CLI price override.
+
+The historical owner authorization used by the recorded example is explicit
+and finite:
 
 - the wallet claims **1.00 TestUSD**;
 - the Core grant allows **1.00 total**, **0.50 per payment**, for **one day**;
 - the wallet approves **BudgetExecutor to spend up to 1.00 TestUSD**;
-- the Agent can request the fixed **0.30 TestUSD** quote for a report.
+- the Agent can request the historical fixed **0.30 TestUSD** quote for a report.
 
 The allowance, grant, policy decision, reservation, payment proof, and delivery
 are separate records. A replay returns the original order and result instead of
 charging again.
+
+The service amount is frozen into each preview and purchase. Changing the
+protected scope changes only new previews; a historical paid-but-undelivered
+order keeps its original amount during recovery and cannot be charged again.
+Budget and payment displays preserve exact token precision through six decimal
+places, while retaining at least two display decimals for values such as
+`0.30`.
 
 The report returns income, expense, net, and category totals. A completed order
 records its purchase ID, payment transaction hash, and output hash.

@@ -129,3 +129,39 @@ def test_backend_sends_structured_scope_and_verifies_returned_signatures(setup_s
         SimpleNamespace(grant=s.grant, owner_signature=s.signature), 2)
     assert result['tx_hash'] == '0x' + keccak(bytes.fromhex(result['raw_transaction'][2:])).hex()
     assert len(s.execution.calls) == len(s.relayer.calls) == 1
+
+
+@pytest.mark.parametrize('amount', [1000, 200])
+def test_configured_service_amount_is_exact_and_signs_only_that_price(setup_scope, amount):
+    s = setup_scope
+    scope = replace(s.scope, service_amount_atomic=amount)
+    signer = ScopedSigner(scope, s.execution, s.relayer)
+    purchase = replace(s.purchase, amount=amount)
+    signature = signer.sign_execution(s.grant, s.signature, purchase)
+    tx = transaction(s, signature) | {
+        'data': encode_execute_calldata_hex(s.grant, s.signature, purchase, signature),
+    }
+    assert Account.recover_transaction(signer.sign_transaction(tx)).lower() == s.gas.address.lower()
+    assert len(s.execution.calls) == len(s.relayer.calls) == 1
+    with pytest.raises(ValueError, match='fixed service price'):
+        signer.sign_execution(s.grant, s.signature, s.purchase)
+    assert len(s.execution.calls) == len(s.relayer.calls) == 1
+
+
+@pytest.mark.parametrize('amount', [0, -1, True, 1000.0, '1000', 500001])
+def test_configured_service_amount_rejects_invalid_scope_before_signing(setup_scope, amount):
+    s = setup_scope
+    with pytest.raises(ValueError, match='service amount'):
+        replace(s.scope, service_amount_atomic=amount)
+    assert not s.execution.calls and not s.relayer.calls
+
+
+def test_legacy_scope_defaults_to_original_price_and_rejects_unknown_fields(setup_scope):
+    from dataclasses import asdict
+    value = asdict(setup_scope.scope)
+    value.pop('service_amount_atomic', None)
+    assert SigningScope.from_json(value).service_amount_atomic == 300000
+    configured = SigningScope.from_json(value | {'service_amount_atomic': 1000})
+    assert configured.service_amount_atomic == 1000
+    with pytest.raises(ValueError, match='invalid signing scope'):
+        SigningScope.from_json(value | {'arbitrary_amount': True})

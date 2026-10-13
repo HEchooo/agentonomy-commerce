@@ -435,9 +435,10 @@ class HostedCommerceService:
             if (preview.get('preview_id') != preview_id
                 or payment.get('pay_to') != identity['agent_wallet']
                 or payment.get('network') != self.scope.network.network
-                or payment.get('asset') != self.scope.network.token
-                or str(payment.get('amount_atomic')) != '300000'):
+                or payment.get('asset') != self.scope.network.token):
                 raise ValueError('frozen preview differs from verified service receiver')
+            from agentonomy_commerce.service_pricing import payment_terms
+            payment_terms(payment)
 
     def _feedback_operation(self, row, canary, operation, args):
         if self.feedback is None:

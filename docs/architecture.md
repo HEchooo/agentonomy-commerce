@@ -25,6 +25,20 @@ The demo is a local rehearsal, not evidence of a live blockchain transaction.
 External chain/risk/service fixtures must be explicit and isolated from the
 production implementation. Production wallet keys are never part of this repo.
 
+## Exact service pricing
+
+The public testnet catalog derives its current amount from the protected
+signer's `scope.service_amount_atomic`. The signer accepts only that exact
+amount, independently of the Agent's request. Decimal prices and budget
+displays preserve all six token decimals; no float conversion or rounding is
+used. The local simulation retains its historical 0.30 price.
+
+Marketplace freezes payment terms into the original preview. Receipt
+validation resolves the purchase back to that preview and checks both the
+decimal amount and atomic units. A later catalog price change never rewrites
+an existing payment or delivery record. Recovery of a paid order uses its
+original receipt and retries delivery without signing another payment.
+
 ## Authorization handoff correction
 
 Commerce corrects one imported Marketplace integration gap: after Core resolves

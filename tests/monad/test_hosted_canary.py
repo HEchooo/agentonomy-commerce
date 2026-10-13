@@ -42,6 +42,8 @@ def setup(result, *, existing=None, expired=False, installation=None):
         calls.append(method)
         if method == 'preview_state':
             return {'preview_id': 'preview_a', 'opc_installation_id': installation,
+                    'payment': {'price_usd': '0.30', 'amount_atomic': '300000',
+                                'network': 'eip155:10143', 'asset': TOKEN, 'pay_to': PAYEE},
                     'expires_at': (datetime.now(UTC)+timedelta(seconds=-1 if expired else 300)).isoformat()}
         if method == 'purchase':
             if existing is None:

@@ -94,6 +94,7 @@ def _receipt(merchant: ReviewMerchant, purchase_id: str, **changes: object) -> s
         "agent_id": scope["agent_id"],
         "wallet_address": scope["payer"],
         "amount_usdc": scope["amount_usdc"],
+        "amount_atomic": scope["amount_atomic"],
         "venue": scope["venue"],
         "destination": scope["pay_to"],
         "chain": scope["chain"],
@@ -411,3 +412,190 @@ def test_review_merchant_rejects_signed_scope_bounds(tmp_path: Path):
 
     assert too_expensive.status_code == 401
     assert unsettled.status_code == 401
+
+
+@pytest.mark.parametrize(
+    ("price_usd", "amount_atomic"),
+    [("0.001", "1000"), ("0.0002", "200")],
+)
+def test_review_merchant_accepts_exact_per_order_subcent_payment_terms(
+    tmp_path: Path, price_usd: str, amount_atomic: str
+):
+    csv_text = _csv("t-1,2026-09-01,Payment,1.00,USD,income")
+    hashes = _expected_hashes(("purchase_subcent", csv_text))
+
+    with ReviewMerchant(
+        tmp_path,
+        receipt_secret=SECRET,
+        network=NETWORK,
+        token=TOKEN,
+        pay_to=PAY_TO,
+        port=0,
+        expected_input_hash=hashes.get,
+        expected_payment=lambda purchase_id: (
+            {"price_usd": price_usd, "amount_atomic": amount_atomic}
+            if purchase_id == "purchase_subcent"
+            else None
+        ),
+    ) as merchant:
+        response = _post(
+            merchant,
+            csv_text,
+            purchase_id="purchase_subcent",
+            receipt=_receipt(
+                merchant,
+                "purchase_subcent",
+                amount_usdc=price_usd,
+                amount_atomic=amount_atomic,
+            ),
+        )
+
+    assert response.status_code == 200
+
+
+def test_review_merchant_accepts_historical_per_order_payment_terms(tmp_path: Path):
+    csv_text = _csv("t-1,2026-09-01,Payment,1.00,USD,income")
+    hashes = _expected_hashes(("purchase_legacy", csv_text))
+
+    with ReviewMerchant(
+        tmp_path,
+        receipt_secret=SECRET,
+        network=NETWORK,
+        token=TOKEN,
+        pay_to=PAY_TO,
+        port=0,
+        expected_input_hash=hashes.get,
+        expected_payment=lambda purchase_id: (
+            {"price_usd": "0.30", "amount_atomic": "300000"}
+            if purchase_id == "purchase_legacy"
+            else None
+        ),
+    ) as merchant:
+        response = _post(
+            merchant,
+            csv_text,
+            purchase_id="purchase_legacy",
+            receipt=_receipt(
+                merchant,
+                "purchase_legacy",
+                amount_usdc="0.30",
+                amount_atomic="300000",
+            ),
+        )
+
+    assert response.status_code == 200
+
+
+def test_review_merchant_rejects_wrong_or_cross_order_payment_terms(tmp_path: Path):
+    csv_text = _csv("t-1,2026-09-01,Payment,1.00,USD,income")
+    hashes = _expected_hashes(
+        ("purchase_one", csv_text),
+        ("purchase_two", csv_text),
+    )
+    expected = {
+        "purchase_one": {"price_usd": "0.001", "amount_atomic": "1000"},
+        "purchase_two": {"price_usd": "0.0002", "amount_atomic": "200"},
+    }
+
+    with ReviewMerchant(
+        tmp_path,
+        receipt_secret=SECRET,
+        network=NETWORK,
+        token=TOKEN,
+        pay_to=PAY_TO,
+        port=0,
+        expected_input_hash=hashes.get,
+        expected_payment=expected.get,
+    ) as merchant:
+        wrong_amount = _post(
+            merchant,
+            csv_text,
+            purchase_id="purchase_one",
+            receipt=_receipt(
+                merchant,
+                "purchase_one",
+                amount_usdc="0.0002",
+                amount_atomic="200",
+            ),
+        )
+        cross_order = _post(
+            merchant,
+            csv_text,
+            purchase_id="purchase_one",
+            receipt=_receipt(
+                merchant,
+                "purchase_two",
+                amount_usdc="0.0002",
+                amount_atomic="200",
+            ),
+        )
+
+    assert wrong_amount.status_code == 401
+    assert cross_order.status_code == 401
+
+
+@pytest.mark.parametrize(
+    "payment_callback",
+    [
+        lambda _purchase_id: None,
+        lambda _purchase_id: {"price_usd": "0.001"},
+        lambda _purchase_id: {"price_usd": "0.001", "amount_atomic": "200"},
+    ],
+)
+def test_review_merchant_fails_closed_for_missing_or_invalid_payment_callback(
+    tmp_path: Path, payment_callback
+):
+    csv_text = _csv("t-1,2026-09-01,Payment,1.00,USD,income")
+    hashes = _expected_hashes(("purchase_invalid", csv_text))
+
+    with ReviewMerchant(
+        tmp_path,
+        receipt_secret=SECRET,
+        network=NETWORK,
+        token=TOKEN,
+        pay_to=PAY_TO,
+        port=0,
+        expected_input_hash=hashes.get,
+        expected_payment=payment_callback,
+    ) as merchant:
+        response = _post(
+            merchant,
+            csv_text,
+            purchase_id="purchase_invalid",
+            receipt=_receipt(
+                merchant,
+                "purchase_invalid",
+                amount_usdc="0.001",
+                amount_atomic="1000",
+            ),
+        )
+
+    assert response.status_code == 503
+
+
+def test_review_merchant_legacy_default_price_remains_030(tmp_path: Path):
+    csv_text = _csv("t-1,2026-09-01,Payment,1.00,USD,income")
+    hashes = _expected_hashes(("purchase_default", csv_text))
+
+    with ReviewMerchant(
+        tmp_path,
+        receipt_secret=SECRET,
+        network=NETWORK,
+        token=TOKEN,
+        pay_to=PAY_TO,
+        port=0,
+        expected_input_hash=hashes.get,
+    ) as merchant:
+        response = _post(
+            merchant,
+            csv_text,
+            purchase_id="purchase_default",
+            receipt=_receipt(
+                merchant,
+                "purchase_default",
+                amount_usdc="0.30",
+                amount_atomic="300000",
+            ),
+        )
+
+    assert response.status_code == 200

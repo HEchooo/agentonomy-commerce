@@ -10,11 +10,40 @@ from examples.monad_commerce.merchant import BudgetMerchant
 from agentonomy_commerce.transport import LoopbackMerchantTransport
 from services.quote_service import QuoteService
 from examples.monad_commerce.purchase_service import MonadPurchaseService
+from agentonomy_commerce.service_pricing import atomic_price_terms, format_token_amount
+
+
+_DEFAULT_SERVICE_AMOUNT_ATOMIC = 300000
+_MAX_SERVICE_AMOUNT_ATOMIC = 500000
 
 class BudgetCommerceRuntime(ReviewRuntime):
     def __init__(self,state_dir,merchant_port,bootstrap):
+        self._configure_service_price(bootstrap)
         super().__init__(state_dir,merchant_port)
         self.core=CoreBridge(self.state_dir,bootstrap)
+
+    def _configure_service_price(self, bootstrap):
+        """Bind the catalog price to the validated signer scope.
+
+        Local bootstrap has no signer configuration and retains the historical
+        0.30 TestUSD default. Hosted/public bootstrap carries the current
+        amount in the protected signer scope; no top-level or CLI override is
+        accepted here.
+        """
+
+        scope = {}
+        if isinstance(bootstrap, dict):
+            signer_configuration = bootstrap.get("signer_configuration")
+            if isinstance(signer_configuration, dict):
+                candidate = signer_configuration.get("scope")
+                if isinstance(candidate, dict):
+                    scope = candidate
+        amount_atomic = scope.get("service_amount_atomic", _DEFAULT_SERVICE_AMOUNT_ATOMIC)
+        terms = atomic_price_terms(amount_atomic)
+        amount_value = int(terms["amount_atomic"])
+        if amount_value > _MAX_SERVICE_AMOUNT_ATOMIC:
+            raise ValueError("service price exceeds the signed per-payment limit")
+        self._service_payment_terms = terms
 
     def _attach_settlement(self, payload):
         purchase = self.repository.get_purchase(payload['purchase_id'])
@@ -41,7 +70,13 @@ class BudgetCommerceRuntime(ReviewRuntime):
             'reserved_amount_usdc','grant_status','chain_grant_id','grant_hash','network','token',
             'pay_to','executor','wallet_address','settlement_submissions'}
         result={key:raw[key] for key in allowed}
-        result['remaining_amount_usdc']=format(Decimal(raw['budget_usdc'])-Decimal(raw['used_amount_usdc'])-Decimal(raw['reserved_amount_usdc']),'.2f')
+        for key in ('budget_usdc', 'used_amount_usdc', 'reserved_amount_usdc'):
+            result[key] = format_token_amount(result[key])
+        result['remaining_amount_usdc']=format_token_amount(
+            Decimal(raw['budget_usdc'])
+            - Decimal(raw['used_amount_usdc'])
+            - Decimal(raw['reserved_amount_usdc'])
+        )
         result['merchant_deliveries']=self.merchant.delivery_count
         result['service_transport']='http'
         result['risk_policy']='testnet_first_party_allowlist'
@@ -66,7 +101,9 @@ class BudgetCommerceRuntime(ReviewRuntime):
             metadata={"trust_tier": "clink_verified", "verification_source": "first_party_review_service",
                       "settlement_mode": "local_anvil", "service_transport": "http"},
             payment_options=[PaymentOption(scheme="exact", network=self._network, asset=self._asset,
-                                           amount_atomic="300000", pay_to=self._pay_to, price_usd="0.30",
+                                           amount_atomic=self._service_payment_terms["amount_atomic"],
+                                           pay_to=self._pay_to,
+                                           price_usd=self._service_payment_terms["price_usd"],
                                            metadata={"token": "TestUSD", "simulation": False})],
         )
         self.repository.upsert_provider(provider)
@@ -85,6 +122,7 @@ class BudgetCommerceRuntime(ReviewRuntime):
                 self.state_dir / "merchant", receipt_secret=self._receipt_signing_key,
                 network=self._network, token=self._asset, pay_to=self._pay_to,
                 port=self.merchant_port, expected_input_hash=self._expected_input_hash,
+                expected_payment=self._expected_payment,
                 resource=RESOURCE,
                 settlement_mode=snapshot['mode'],
             )

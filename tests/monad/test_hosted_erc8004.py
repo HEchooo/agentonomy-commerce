@@ -64,10 +64,16 @@ class OrderCanary(PersistentCanary):
         super().__init__(*args, **kwargs)
         self.network = validate_bootstrap(self.config).network
         self.payment = {'pay_to': self.network.payee, 'network': 'eip155:10143',
-                        'asset': self.network.token, 'amount_atomic': '300000'}
-        self.market = SimpleNamespace(request=lambda method, args: {
-            'preview_id': args['preview_id'], 'payment': self.payment,
-        })
+                        'asset': self.network.token, 'price_usd': '0.30',
+                        'amount_atomic': '300000'}
+        self.market = SimpleNamespace(request=self._preview_state)
+
+    def _preview_state(self, method, args):
+        if method != 'preview_state':
+            raise AssertionError(method)
+        if args.get('preview_id') != 'preview_a':
+            raise KeyError(args.get('preview_id'))
+        return {'preview_id': 'preview_a', 'payment': self.payment}
 
     def _start_market(self):
         pass

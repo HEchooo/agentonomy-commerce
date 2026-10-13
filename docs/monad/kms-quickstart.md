@@ -2,8 +2,8 @@
 
 This is an operator-run **Monad testnet** path. The public wallet supplies its
 own signatures; the application never receives its private key. As of
-2026-10-07, both contracts, owner wallet setup, one `0.30 TestUSD` payment and
-same-order delivery/recovery were verified; see the [live
+2026-10-07, both contracts, owner wallet setup, one historical `0.30 TestUSD`
+payment and same-order delivery/recovery were verified; see the [live
 deployment evidence](role-session-acceptance.md). Chain revocation, recording,
 license choice and final submission remain pending. The existing review website
 is a separate deployment and is not upgraded by starting this command.
@@ -15,7 +15,8 @@ is a separate deployment and is not upgraded by starting this command.
 - Gas relayer: `0xBdCb39Ac5Ff83485cb35160F0DdAA0b7446Ee009`.
 - Merchant payee uses the relayer address for this no-value test asset.
 - Total budget and finite allowance: **1.00 TestUSD**; per purchase cap:
-  **0.50 TestUSD**; CSV service price: **0.30 TestUSD**; signed grant: one day.
+  **0.50 TestUSD**; historical CSV service price: **0.30 TestUSD**; signed
+  grant: one day.
 - Buyer needs test MON for approval and revocation; relayer needs test MON for
   deployment and payment execution. The execution-signing address needs no gas.
 - Use the approved runtime role through an independent temporary session and
@@ -98,13 +99,30 @@ After deployment, prepare a private `configuration.json` outside version control
    chaining. Startup checks identity before key metadata, public keys and DryRun.
 3. `scope`: `network` (the same network fields as deployment, excluding wallet,
    domain and code-hash fields), `owner`, `execution_address`, `relayer_address`,
-   `nonce_min`, `nonce_max`. After exactly two initial CREATEs from nonce 0,
-   a three-purchase canary uses nonce 2 through 4; always check current nonce.
+   `nonce_min`, `nonce_max`, and optional `service_amount_atomic`. The optional
+   service amount is a positive integer from `1` through `500000`; omitting it
+   preserves the legacy `300000` default. After exactly two initial CREATEs from
+   nonce 0, a three-purchase canary uses nonce 2 through 4; always check current
+   nonce.
 
 No access key, secret, session token, wallet key or seed belongs in this JSON.
 Configuration must match the signed budget and deployed contracts exactly.
 Startup independently checks both RPCs, token identity, executor chain/token,
 canonical Verified boundary and actual runtime code hashes.
+
+For a new public testnet deployment, set the protected
+`scope.service_amount_atomic` to `1000` for a **0.001 TestUSD** CSV service
+price; `200` selects **0.0002 TestUSD**. The signer configuration and web
+bootstrap copies must carry the same exact scope value, and startup rejects a
+mismatch. There is no top-level or CLI price override. Prices and budget
+displays retain exact token precision through six decimal places without
+rounding, while values such as `0.30` keep at least two display decimals. This
+deployment choice does not change the dated `0.30` acceptance above until a
+fresh public run records the new amount.
+
+The selected amount is frozen in each preview and purchase. A later scope
+change affects only new previews; recovery of a historical paid-but-undelivered
+order uses its original amount and does not create a second charge.
 
 The role session expires independently of the onchain budget. Record its expiry
 privately and renew before recording when necessary. Never put credential values

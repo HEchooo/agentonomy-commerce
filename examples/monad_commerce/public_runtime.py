@@ -6,6 +6,7 @@ from examples.monad_commerce.public_bridge import PublicCoreBridge
 
 class PublicCommerceRuntime(BudgetCommerceRuntime):
     def __init__(self, state_dir, merchant_port, bootstrap):
+        self._configure_service_price(bootstrap)
         ReviewRuntime.__init__(self, state_dir, merchant_port)
         self.core = PublicCoreBridge(self.state_dir, bootstrap)
 

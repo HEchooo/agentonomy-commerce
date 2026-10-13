@@ -74,6 +74,7 @@ from services.funding_service.budget_binding import derive_agent_scope  # noqa: 
 from services.funding_service.budget_service import BudgetFundingService  # noqa: E402
 from services.policy_service.budget_policy import BudgetPolicyService  # noqa: E402
 from shared.budget_config import BudgetAppConfig  # noqa: E402
+from agentonomy_commerce.service_pricing import format_token_amount  # noqa: E402
 
 
 PUBLIC_MODE = "monad_testnet"
@@ -1699,9 +1700,9 @@ class ExternalWalletCore(CoreRuntime):
             "simulation": False,
             "real_funds": False,
             "token_symbol": "TestUSD",
-            "budget_usdc": format(Decimal(str(grant.max_amount_usdc)), ".2f"),
-            "used_amount_usdc": format(Decimal(str(grant.used_amount_usdc)), ".2f"),
-            "reserved_amount_usdc": format(Decimal(str(grant.reserved_amount_usdc)), ".2f"),
+            "budget_usdc": format_token_amount(Decimal(str(grant.max_amount_usdc))),
+            "used_amount_usdc": format_token_amount(Decimal(str(grant.used_amount_usdc))),
+            "reserved_amount_usdc": format_token_amount(Decimal(str(grant.reserved_amount_usdc))),
             "grant_status": grant.status,
             "grant_id": grant.spending_grant_id,
             "chain_grant_id": self.budget_binding.grant_id,

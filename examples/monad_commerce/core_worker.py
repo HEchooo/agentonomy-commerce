@@ -24,6 +24,7 @@ from eth_keys import keys
 from eth_utils import keccak
 from agentonomy_commerce.budget_network import NetworkConfig, RpcClient
 from agentonomy_commerce.budget_backend import BudgetBackend
+from agentonomy_commerce.service_pricing import format_token_amount
 from apps.facilitator.budget_protocol import SpendGrant, sign_grant
 from examples.commerce.core_persistence import StateLock, _atomic_write_json, _atomic_write_bytes
 from services.account_service.repository import AccountRepository
@@ -46,7 +47,7 @@ MERCHANT_ID='commerce_analytics'
 VENUE='clink_marketplace'
 TRUST_TIER='clink_verified'
 RESOURCE='https://merchant.agentonomy.invalid/v1/reconcile'
-def _money(value): return format(Decimal(str(value)), '.2f')
+def _money(value): return format_token_amount(Decimal(str(value)))
 def _sign(digest,key):
     sig=keys.PrivateKey(bytes(key)).sign_msg_hash(digest)
     return sig.r.to_bytes(32,'big')+sig.s.to_bytes(32,'big')+bytes([sig.v+27])
