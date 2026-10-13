@@ -36,8 +36,30 @@ The [micro-price acceptance record](docs/monad/public-micro-price-acceptance-202
 contains the transaction, report hashes, assessment, and history evidence. The
 dated 0.30 TestUSD run remains historical in
 [its acceptance record](docs/monad/public-wallet-acceptance-20261013.md).
-Buyer feedback remains zero; revocation/refusal, second-wallet isolation, and
-the recording/final-submission gates remain pending.
+Buyer feedback remains zero. Revocation/refusal and second-wallet public
+acceptance remain pending. The recorded demo and pitch are now available below.
+
+## Recorded demo
+
+On 2026-10-14, the public review deployment was used for an English technical
+demo recording. The raw take completed a `0.001 TestUSD` purchase that moved
+from pending through recovery of the same order to delivery. The returned
+report matched USD `255.00` income, `40.50` expense, and `214.50` net; reopening
+the report returned the existing result without another charge. The consumer
+Agent recorded task `100`, result `100`, and interaction `80`, for a weighted
+`96/100` medium-confidence off-chain opinion. This is separate from the
+micro-price preflight record above; it is not an on-chain score, and no manual
+buyer feedback was included. Revocation and second-wallet isolation were not
+part of this recording.
+
+- [Working product demo](https://review.agentonomy.xyz/videos/technical-demo.html)
+  — 2:09, with Alba English narration and English captions.
+- [Product pitch](https://review.agentonomy.xyz/videos/pitch.html)
+  — 1:25, explaining the problem, motivation, and marketplace direction.
+
+The demo uses the actual recorded workflow. Waiting time is shortened; the
+original playback speed is preserved. Narration is generated after recording.
+The pitch is an illustrated product introduction, separate from live evidence.
 
 ## The concrete example
 
@@ -284,7 +306,8 @@ future public acceptance:
 | Commerce history and reauthorization | On 2026-10-13, 734 Monad tests, 21 Core budget tests, 101 commerce/review tests, 86 imported marketplace tests, and 6 submission checks passed. A continuous local Anvil scenario covered two real contract payments across grant renewal, distinct revocations, original-order replay/recovery, and restart without another charge. Buyer feedback and shared history passed local boundary tests. A public Marketplace startup namespace collision was reproduced and fixed in `1892f64`, with real clean-process startup regression coverage; search and details subsequently passed against the public MCP endpoint. |
 | Historical public own-wallet acceptance (2026-10-13) | The earlier run completed one `0.30 TestUSD` purchase, delivery, and same-order recovery. Its payment and assessment evidence remain in the [dated acceptance record](docs/monad/public-wallet-acceptance-20261013.md). |
 | Current public micro-price acceptance (2026-10-14) | Release `71a9289bf7f8cc4d2adfc8f00177e4b6ee8a5c72` completed `preview_28588c34eaa6` → `purchase_28588c34eaa6` for `0.001 TestUSD` (`1000` atomic) on chain `10143`. Payment [`0x52b462f432de970ad6d33e42f55144c38ab0d21c4bce921b30fb1f27e482e68e`](https://testnet.monadexplorer.com/tx/0x52b462f432de970ad6d33e42f55144c38ab0d21c4bce921b30fb1f27e482e68e) was observed in block `70731638`, finality block `70731719`, and recovered to the same delivered order. The detailed record contains the independent hash, budget, assessment, and history evidence. |
-| Remaining public acceptance | Pending: Core and on-chain revoke with a refused new purchase, second-wallet isolation, technical recording, publication of the existing pitch film, and final form review/submission. Optional buyer feedback remains zero and outside this acceptance result. |
+| Recorded public demo (2026-10-14) | The English recording completed a `0.001 TestUSD` purchase, same-order recovery, delivery, report reopen without another charge, and a `96/100` medium-confidence off-chain consumer-Agent opinion. The published film is 128.8667 seconds with English narration and captions. See the [recorded demo note](docs/monad/recorded-demo-20261014.md). |
+| Remaining public acceptance | Pending: Core and on-chain revoke with a refused new purchase, and second-wallet isolation. Optional buyer feedback remains zero and outside this acceptance result. |
 
 These records demonstrate the testnet purchase, delivery, and assessment loop.
 Revocation and second-wallet public acceptance remain listed separately;
