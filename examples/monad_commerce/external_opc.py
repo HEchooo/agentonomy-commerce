@@ -437,6 +437,8 @@ class ExternalHostedCommerceService(ExternalFeedbackMixin, ExternalHistoryMixin,
             row, canary = self._credential(access_token)
             if operation in {'feedback_prepare', 'feedback_status', 'feedback_verify'}:
                 return self._device_feedback(row, canary, operation, args)
+            if operation in {'assessment_record', 'assessment_status'}:
+                return self._device_assessment(row, canary, operation, args)
             if operation == 'service_history':
                 if set(args) != {'offering_id'}:
                     raise ValueError('service history fields outside scope')

@@ -13,9 +13,12 @@ verified, delivery is recorded against the returned output hash, and the user
 receives a clear receipt. Private keys stay in the user's wallet and are never
 held by the Agent.
 
-Verifiable payment and delivery records, together with explicitly supplied
-buyer feedback, build a service history that can help future Agents choose
-between providers. The current pilot has one first-party CSV reconciliation
+Verifiable payment and delivery records, consumer-Agent service assessments,
+and optional buyer feedback build a service history that can help future Agents
+choose between providers. After delivery, the consumer Agent evaluates the
+task, result, and observed interaction without asking the user for a score.
+Its off-chain judgment remains separate from verified chain facts. The current
+pilot has one first-party CSV reconciliation
 service, demonstrating the transaction-to-history loop. A multi-merchant market
 with reputation-informed selection is the next integration stage.
 
@@ -25,8 +28,13 @@ Website: [agentonomy.xyz](https://agentonomy.xyz/) · X:
 
 Wallet authorization site: [review.agentonomy.xyz](https://review.agentonomy.xyz)
 · Monad testnet · valueless test assets. The wallet site and external MCP flow
-are deployed publicly. Fresh own-wallet purchase acceptance is still pending;
-deployment and signer readiness do not establish a completed purchase.
+are deployed publicly. On 2026-10-13, a fresh owner-wallet run completed one
+0.30 TestUSD purchase and delivery on chain 10143; the payment was verified
+through two RPC observations and the same order was recovered without a second
+charge. The [public acceptance record](docs/monad/public-wallet-acceptance-20261013.md)
+contains the transaction and hash evidence. Optional buyer feedback was not
+submitted in this run and is not counted; revocation/refusal and second-wallet
+isolation remain pending.
 
 ## The concrete example
 
@@ -56,9 +64,10 @@ Agent Gateway to request commerce; it cannot call Core or a merchant directly.
 The Agent is the user's Codex or another MCP client. A local device bridge
 connects it to the hosted MCP endpoint. The wallet site only manages wallet
 binding, spending authorization, device consent, and revocation. Service search,
-quotes, purchases, and reports stay in the Agent conversation. Buyer feedback also starts in the
-Agent conversation; a separate, temporary wallet page discloses the frozen
-rating and requests its on-chain signature.
+quotes, purchases, reports, and automatic service assessment stay in the Agent
+conversation. Optional buyer feedback also starts there; a separate, temporary
+wallet page discloses that buyer's frozen rating and requests its on-chain
+signature.
 
 ```mermaid
 flowchart TB
@@ -76,7 +85,8 @@ flowchart TB
     I[Service identity guard]
     R[HTTP merchant]
     H[Shared service history]
-    F[Verified ERC-8004 buyer feedback]
+    F[Optional verified ERC-8004 buyer feedback]
+    E[Consumer Agent assessment · off-chain]
   end
 
   subgraph settlement[Core and chain settlement]
@@ -102,11 +112,13 @@ flowchart TB
   R -->|report + output hash| M
   M -->|report + payment evidence| G --> D --> A
   G -->|verified delivered payment + output hash| H
-  A -->|explicit buyer rating| G
+  A -->|task, result and interaction assessment| G
+  G -->|one assessment per verified paid order| E --> H
+  A -->|optional explicit buyer rating| G
   G -.->|temporary feedback consent link| U
   W -->|buyer signs frozen feedback| F
   F -->|two-RPC verified evidence| H
-  H -->|delivery counts, optional ratings, sample size, freshness| G
+  H -->|delivery facts, Agent opinions, optional buyer ratings| G
 ```
 
 The diagram shows logical components, rather than separate operating-system
@@ -181,9 +193,18 @@ finite allowance still limit what the wallet can buy.
 ERC-8004 identifies the service: its owner, receiving wallet, metadata URI, and
 runtime code pins are checked before a purchase. That identity check does not
 grant the buyer a budget and does not replace Core policy or risk approval.
-ERC-8004 support covers Identity and Reputation. After a delivered order with
-verified payment and an output hash, the Agent can prepare a rating explicitly
-supplied by the buyer. It receives a temporary same-origin consent link, never
+After a verified delivery, the consumer Agent evaluates task fulfillment,
+result quality, and the actual interaction. It records a bounded assessment
+through MCP without another wallet signature. The current rubric uses 40/40/20
+weights, an explicit confidence level, and a fixed set of supporting check
+codes. Replaying the same assessment returns the original record; an order
+cannot add another sample. The service does not run a background language
+model: the consumer Agent reasons from its task and result. If evidence is
+insufficient, it abstains. See the [assessment contract](docs/monad/agent-service-assessment.md).
+
+ERC-8004 support covers Identity and Reputation. Separately, if a buyer requests
+an on-chain review, the Agent can prepare the buyer's explicit rating. It
+receives a temporary same-origin consent link, never
 a wallet transaction or
 signing credential. The authenticated buyer reviews the score, payment hash,
 and output hash in a separate wallet page and signs the fixed registry
@@ -197,9 +218,13 @@ and output hash; it excludes the CSV and report. Signing feedback therefore
 explicitly publishes these transaction-linked facts.
 
 The shared service-history projection indexes verified payment and delivery
-records once and reads verified ERC-8004 feedback separately. Search, service
-details, and
-`get_clink_service_history` expose observed delivery counts, optional buyer
+records once and reads Agent assessments and verified ERC-8004 feedback
+separately. Agent scores are labeled `authenticated_consumer_agent`,
+`on_chain: false`, and `judgment_independently_verified: false`; a verified
+payment and output hash do not independently prove that an opinion is correct.
+Search, service details, and
+`get_clink_service_history` expose observed delivery counts, Agent assessment
+averages and supporting checks, optional buyer
 rating averages, sample sizes, bounded public evidence hashes, and observation
 times across buyers. Private wallet orders, input, reports, budgets, and device
 identity remain isolated. Public hashes can be looked up on chain; this is not
@@ -235,11 +260,12 @@ future public acceptance:
 | Local behavior | Tested implementations cover budget limits, expiry, revocation, replay protection, paid-order recovery, execution isolation, and feedback verification. |
 | External Agent integration | Local checks cover device proof, browser consent, authenticated MCP transport, effective consent expiry, device-scoped execution, and wallet selection. On 2026-10-10 the external flow was deployed publicly; the configured Codex stdio bridge initialized and queried its unpaired device state against the live service. During that check, wallet consent and a live purchase were pending; the current 2026-10-13 preflight is recorded separately below. |
 | Monad testnet deployment | Recorded on 2026-10-08: two chain-10143 contracts and the ERC-8004 registration for Agent 2073 were deployed; two independently operated RPC paths checked the deployment, and the HTTPS registration metadata was deployed and verified. |
-| Current public deployment preflight | On 2026-10-13, the commerce release was deployed with wallet state retained. Anonymous account/status access returned 401; binding and feedback assets returned HTTPS 200 and matched the tested source. Two RPC providers agreed on the chain-10143 deployment and service identity; both isolated-signer KMS DryRuns passed. A clean external MCP client listed all 11 business tools and successfully queried search, details and shared history. A 0.30 TestUSD preview reported Core-authorized automatic payment; the subsequent readiness query showed 1.00 remaining, 0.00 used and 0.00 reserved. No purchase was executed or broadcast during this preflight. A fresh desktop MCP reconnect and own-wallet acceptance are still required. |
+| Public deployment preflight (historical) | Before the wallet run on 2026-10-13, the commerce release was deployed with wallet state retained. Anonymous account/status access returned 401; binding and feedback assets returned HTTPS 200 and matched the tested source. Two RPC providers agreed on the chain-10143 deployment and service identity; isolated-signer KMS DryRuns passed. A clean external MCP client listed all 11 business tools and queried search, details and shared history. This preflight did not itself execute a purchase. |
 | Public rollout | On 2026-10-10, release `dd3e8e8` was deployed with existing state retained. Public binding assets and registration metadata returned HTTPS 200, anonymous account access returned 401, and the isolated signer passed role/address validation and both KMS DryRuns. The unavailable secondary RPC was replaced with Ankr; both providers agreed on the finalized boundary and deployed contract hashes. No purchase was signed or broadcast during these checks. |
 | Recording preflight | On 2026-10-11, missing approved contract code-hash pins were restored and clean worker startup was fixed. Release `3b8e459` passed an isolated hosted Core startup check; public HTTPS, signer readiness, both KMS DryRuns, dual-RPC deployment checks, and Agent 2073 identity verification passed. The relevant local suites passed 714 tests. Buyer state was unchanged: TestUSD claim, authorization, purchase, and revoke remain pending. |
-| Commerce history and reauthorization | On 2026-10-13, 734 Monad tests, 21 Core budget tests, 101 commerce/review tests, 86 imported marketplace tests, and 6 submission checks passed. A continuous local Anvil scenario covered two real contract payments across grant renewal, distinct revocations, original-order replay/recovery, and restart without another charge. Buyer feedback and shared history passed local boundary tests. A public Marketplace startup namespace collision was reproduced and fixed in `1892f64`, with real clean-process startup regression coverage; search and details subsequently passed against the public MCP endpoint. Fresh purchase and feedback acceptance remain pending. |
-| Fresh public own-wallet acceptance | Pending: a new run must still prove purchase, delivery, same-order replay, buyer feedback signing and independent readback, revoke, and second-wallet isolation. |
+| Commerce history and reauthorization | On 2026-10-13, 734 Monad tests, 21 Core budget tests, 101 commerce/review tests, 86 imported marketplace tests, and 6 submission checks passed. A continuous local Anvil scenario covered two real contract payments across grant renewal, distinct revocations, original-order replay/recovery, and restart without another charge. Buyer feedback and shared history passed local boundary tests. A public Marketplace startup namespace collision was reproduced and fixed in `1892f64`, with real clean-process startup regression coverage; search and details subsequently passed against the public MCP endpoint. |
+| Current public own-wallet acceptance | Run `public-rehearsal-20261013132037-9d10c5e` completed `preview_d374cffac2a8` → `purchase_d374cffac2a8` for `0.30 TestUSD` on chain `10143`. Payment [`0x97a3318a99ff9ecb4aec97aa76bc504fd63f96a44c1c5fecd7a74794347e8d00`](https://testnet.monadexplorer.com/tx/0x97a3318a99ff9ecb4aec97aa76bc504fd63f96a44c1c5fecd7a74794347e8d00) was observed in block `70692227`, with block hash `0x108776c60ded4247528020a40866a45eacae6a6d06fd456d363cf873e5bb47d2`; two RPC observations agreed with `monad_verified`, including the canonical payment hash. Delivery completed once; its output hash is `0x21701fdadede68174bf335856d9ffc101935f674513f1eddeb77995a6aeca8c2`, and the canonical report SHA-256 was independently recomputed and matched. Repeating execute for the same preview returned the same purchase, receipt, transaction and output without another charge. Budget ended at used `0.30`, reserved `0.00`, remaining `0.70`; shared history contains one verified delivery. Optional buyer feedback was not submitted in this run and is not counted. Automatic Agent evaluation is a future direction and is not implemented in this release. See the [detailed acceptance record](docs/monad/public-wallet-acceptance-20261013.md). |
+| Remaining public acceptance | Pending: fresh Core and on-chain revoke with refused new purchase, second-wallet isolation, technical/pitch videos, and final form review/submission. Optional feedback remains outside the current acceptance result. |
 
 These records do not claim a complete live closed loop, production adoption, or
 a security audit. TestUSD has no monetary value.
@@ -276,12 +302,18 @@ Once wallet consent is complete, the demonstration is:
    the original purchase ID until its verified result is available.
 4. Execute the same `preview_id` again to show the original result and transaction
    hash. Query service history and confirm the delivery is counted only once.
-5. If the buyer chooses to rate the delivered service, use
+5. For the normal Agent workflow, assess the delivered result against the task
+   and observed interaction, then call `record_clink_purchase_assessment`.
+   Read it with `get_clink_purchase_assessment` and inspect the separate
+   `agent_assessments` section of service history. Do not ask for a human score
+   or open the optional feedback wallet flow by default. Do not invent checks
+   or a score when evidence is insufficient.
+6. Only if the buyer chooses to submit a human review, use
    `prepare_clink_purchase_feedback` with their explicit score. Open its consent
    link, let the buyer sign, then call `get_clink_purchase_feedback` to verify
    the original transaction and `get_clink_service_history` to read its evidence.
    `verify_clink_purchase_feedback` can recover a known original wallet hash.
-6. Capture all purchase and feedback footage before revoking authorization.
+7. Capture all purchase and assessment footage before revoking authorization.
    Revoke from the wallet page, then show that a new purchase is denied. A later
    run requires explicit new authorization and fresh device consent; it must
    not revive an old preview or reset spent amounts.

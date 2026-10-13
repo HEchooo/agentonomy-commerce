@@ -3,9 +3,13 @@
 Prepared on 2026-10-07 for **Agentonomy Commerce**, team **Agentonomy**, contact
 `fengjie@alvinsclub.ai`. The authenticated form was inspected and the project description and judge
 access instructions were saved on **2026-10-07 at 15:22 UTC**. The entry is a
-saved draft, **not a final submission**. Its checklist is **3/5 complete**:
-primary track, project details and logo are complete; live product and videos
-are incomplete. The observed deadline is **2026-10-14, 11:59 GMT+8**.
+saved draft, **not a final submission**. Its saved checklist is **3/5
+complete**: primary track, project details and logo are complete; the saved
+live product and video fields are empty. Since that snapshot, a fresh public
+own-wallet run has completed one Monad testnet purchase and delivery; the
+current public evidence and remaining acceptance boundaries are recorded below,
+but the form has not been resaved or submitted. The observed deadline is
+**2026-10-14, 11:59 GMT+8**.
 
 [form-saved.json](form-saved.json) contains the exact currently saved fields.
 The copy below is reusable supporting text; it is not a claim that every
@@ -20,9 +24,9 @@ paragraph below was separately entered into the form.
 | Name / one-liner | 120 / 200 characters; saved 19 / 93 |
 | Description / go-to-market | Each up to 8,000 characters; saved 2,469 / 1,485 |
 | GitHub | Public, or shared with metropolis@hackathon.monad.xyz; public repository supplied |
-| Live product | Required HTTPS URL; must run on Monad Mainnet or Testnet; empty |
-| Technical demo | Required hosted video URL, working product, up to 3 minutes; empty |
-| Pitch | Required hosted video URL, team/problem/why, up to 2 minutes; empty |
+| Live product | Required HTTPS URL; must run on Monad Mainnet or Testnet; empty in the 2026-10-07 saved snapshot |
+| Technical demo | Required hosted video URL, working product, up to 3 minutes; empty in the 2026-10-07 saved snapshot |
+| Pitch | Required hosted video URL, team/problem/why, up to 2 minutes; empty in the 2026-10-07 saved snapshot |
 | Judge access | Optional, up to 8,000 characters; saved 1,264 |
 
 The inspected form has no license field, and the current selected-track
@@ -52,8 +56,11 @@ signed limits. Payment is independently verified, delivery is recorded against
 the returned output hash, and private keys stay in the user's wallet. If
 delivery is interrupted, the same paid order can recover without another charge.
 
-Verifiable payment and delivery records, together with explicitly supplied
-buyer feedback, build a service history for future selection. The current pilot
+Verifiable payment and delivery records, automatic consumer-Agent assessments,
+and optional buyer feedback build a service history for future selection.
+The consumer Agent evaluates task fulfillment, result quality, and its observed
+interaction; its off-chain opinion is explicitly separated from verified
+payment facts and requires no additional wallet signature. The current pilot
 has one first-party CSV reconciliation service; it demonstrates the
 transaction-to-history loop, while a mature multi-merchant reputation ranking
 is a future expansion.
@@ -96,15 +103,37 @@ testnet owner-wallet acceptance remains to be recorded.
 
 ## Public deployment preflight (2026-10-13)
 
-On 2026-10-13, the commerce release was deployed publicly with wallet state
-retained. Anonymous account and status access returned 401; binding and feedback
-assets returned HTTPS 200; a clean external MCP client listed all 11 business
-tools and queried search, service details and shared history. Two RPC providers
-agreed on the chain-10143 deployment and service identity, and both isolated
-signer KMS DryRuns passed. The buyer's budget and finite allowance were prepared,
-but fresh device consent, a new own-wallet purchase and delivery, same-order
-replay, buyer feedback signing and readback, and revocation remain pending. No
-purchase was executed or broadcast during this preflight.
+Before the fresh wallet run, the commerce release was deployed publicly with
+wallet state retained. Anonymous account and status access returned 401; binding
+and feedback assets returned HTTPS 200; a clean external MCP client listed all
+11 business tools and queried search, service details and shared history. Two
+RPC providers agreed on the chain-10143 deployment and service identity, and
+both isolated signer KMS DryRuns passed. This preflight itself did not execute
+or broadcast a purchase.
+
+## Current public own-wallet acceptance (2026-10-13)
+
+Run `public-rehearsal-20261013132037-9d10c5e` completed
+`preview_d374cffac2a8` → `purchase_d374cffac2a8` for `0.30 TestUSD` on Monad
+chain `10143`. The payment transaction
+[`0x97a3318a99ff9ecb4aec97aa76bc504fd63f96a44c1c5fecd7a74794347e8d00`](https://testnet.monadexplorer.com/tx/0x97a3318a99ff9ecb4aec97aa76bc504fd63f96a44c1c5fecd7a74794347e8d00)
+was included in block `70692227` with block hash
+`0x108776c60ded4247528020a40866a45eacae6a6d06fd456d363cf873e5bb47d2`.
+Two RPC observations agreed on `monad_verified`, including the canonical
+payment hash. Delivery completed once with output hash
+`0x21701fdadede68174bf335856d9ffc101935f674513f1eddeb77995a6aeca8c2`; the
+canonical report SHA-256 was independently recomputed and matched. Repeating
+execute for the same preview returned the same purchase, receipt, transaction
+and output without another charge. The final budget was used `0.30`, reserved
+`0.00`, remaining `0.70` TestUSD, and shared history contains one verified
+delivery. Optional buyer feedback was not submitted in this run and is not
+counted. Automatic Agent evaluation is a future direction and is not
+implemented in this release.
+
+Remaining public acceptance is limited to fresh Core and on-chain revocation
+with a refused new purchase, second-wallet isolation, and the technical/pitch
+videos. Optional feedback is outside the current acceptance result. See the
+[detailed public acceptance record](../../docs/monad/public-wallet-acceptance-20261013.md).
 
 ## Monad integration
 
@@ -152,13 +181,13 @@ customers, revenue, partnerships or adoption metrics are claimed.
 | Source repository | https://github.com/HEchooo/agentonomy-commerce |
 | Website | https://agentonomy.xyz/ |
 | X | https://x.com/AgentonomyXYZ |
-| Public wallet / MCP endpoint | https://review.agentonomy.xyz/ — deployed on Monad testnet; fresh own-wallet purchase acceptance pending |
-| Live acceptance | [role-session-acceptance.md](../../docs/monad/role-session-acceptance.md) |
+| Public wallet / MCP endpoint | https://review.agentonomy.xyz/ — deployed on Monad testnet; one fresh own-wallet purchase and delivery recorded, optional feedback not submitted, revoke/isolation still pending |
+| Live acceptance | [public-wallet-acceptance-20261013.md](../../docs/monad/public-wallet-acceptance-20261013.md) |
 | Public evidence data | [public-evidence.json](public-evidence.json) |
 | Quickstart | [quickstart.md](../../docs/monad/quickstart.md) |
 | Technical video | Pending recording and actual accessible URL |
 | Pitch video | Pending recording and actual accessible URL |
-| Reviewer-accessible live Monad API | https://review.agentonomy.xyz/ — public wallet and MCP endpoint; fresh purchase acceptance pending |
+| Reviewer-accessible live Monad API | https://review.agentonomy.xyz/ — public wallet and MCP endpoint; one purchase is recorded, optional feedback not submitted, revoke/isolation still pending |
 | Track | Trust, Identity & AI Infrastructure — selected in the saved form |
 | First-party open-source license | Pending owner choice; existing notices retained |
 
@@ -172,17 +201,19 @@ acceptance record for public-chain evidence.
   final declarations and the current track rules before final submission.
   Deadline observed in the authenticated form: October 14, 11:59 GMT+8.
 - Verify the deployed public wallet and MCP endpoint at
-  https://review.agentonomy.xyz/ and its Monad testnet configuration. Use it for
-  the live product field only with the fresh acceptance evidence; keep local
-  simulated settlement clearly separate from live Monad evidence.
+  https://review.agentonomy.xyz/ and its Monad testnet configuration. The fresh
+  purchase, delivery and same-order replay are recorded in the acceptance
+  record; keep local simulated settlement clearly separate from live Monad
+  evidence.
 - Add real technical and pitch video URLs after recording. Do not use placeholder
   links or substitute simulated footage for the Monad payment.
 - Confirm the first-party license choice if the current form requires an OSI
   license. Existing authorization to publish eligible code is already recorded.
-- Capture purchase, delivery, transaction, feedback and history evidence before
-  revoking. Then revoke from the wallet and verify that a new purchase is refused
-  while at least 0.30 TestUSD remains; record any post-revoke read behavior only
-  if it is observed.
+- The purchase, delivery, transaction, same-order replay and delivery-history
+  evidence are recorded. Before final submission, capture the buyer's feedback
+  signing/readback, then revoke from the wallet and verify that a new purchase
+  is refused while at least 0.30 TestUSD remains. Test a second wallet for
+  isolation, and record any post-revoke read behavior only if it is observed.
 - Verify the public repository and video access in a signed-out browser. Bind
   any downloaded source package to its actual Git commit and SHA-256 manifest.
 - Present the completed form to the user for final review before submitting.

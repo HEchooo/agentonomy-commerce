@@ -8,6 +8,24 @@ from examples.commerce.node import object_schema, IDENTIFIER
 from examples.monad_commerce.node import TOOLS
 
 
+_ASSESSMENT_BASIS_CODES = [
+    'requirements_checked', 'arithmetic_checked', 'format_checked',
+    'output_hash_checked', 'recovery_observed', 'single_charge_observed',
+    'interaction_reviewed', 'limitations_noted',
+]
+_ASSESSMENT_SCHEMA = object_schema({
+    'rubric_version': {'type': 'string', 'enum': ['agent-service-v1']},
+    'task_fulfillment': {'type': 'integer', 'minimum': 0, 'maximum': 100},
+    'result_quality': {'type': 'integer', 'minimum': 0, 'maximum': 100},
+    'interaction_quality': {'type': 'integer', 'minimum': 0, 'maximum': 100},
+    'confidence': {'type': 'string', 'enum': ['low', 'medium', 'high']},
+    'basis_codes': {'type': 'array', 'minItems': 1, 'maxItems': 8,
+                    'uniqueItems': True,
+                    'items': {'type': 'string', 'enum': _ASSESSMENT_BASIS_CODES}},
+}, ['rubric_version', 'task_fulfillment', 'result_quality',
+    'interaction_quality', 'confidence', 'basis_codes'])
+
+
 def device_proxy(service, access_token):
     definitions = deepcopy(TOOLS)
     definitions['get_clink_account_readiness'] = (
@@ -20,7 +38,7 @@ def device_proxy(service, access_token):
                        'csv_text': {'type': 'string', 'minLength': 1, 'maxLength': 131072}}, ['purchase_id']),
     )
     definitions['prepare_clink_purchase_feedback'] = (
-        'feedback_prepare', 'Prepare an immutable buyer rating for your verified delivered order. Ask the user for an explicit integer score 0..100; never invent it. Open the returned wallet consent link for disclosure and signing. This tool never sends a transaction.',
+        'feedback_prepare', 'Prepare optional explicit buyer feedback for your verified delivered order only when the user asks for it. Never solicit a fixed score as part of normal Agent assessment and never invent a score. Open the returned wallet consent link for disclosure and signing. This tool never sends a transaction.',
         object_schema({'purchase_id': IDENTIFIER, 'score': {'type': 'integer', 'minimum': 0, 'maximum': 100}}, ['purchase_id', 'score']),
     )
     definitions['get_clink_purchase_feedback'] = (
@@ -32,13 +50,24 @@ def device_proxy(service, access_token):
         object_schema({'purchase_id': IDENTIFIER, 'transaction_hash': {'type': 'string', 'pattern': r'^0x[0-9a-fA-F]{64}$'}}, ['purchase_id', 'transaction_hash']),
     )
     definitions['get_clink_service_history'] = (
-        'service_history', 'Read verified public service history shared across buyers: delivered payments and optional buyer ratings are separate. Report sample size and verification freshness; no history means no rating. One pilot service is configured, so do not claim competing merchants or an established market.',
+        'service_history', 'Read verified public service history shared across buyers. Delivered payments, off-chain consumer-Agent assessments, optional buyer ratings, and operational reputation are separate signals. Report sample size and freshness; no history means no rating. One pilot service is configured, so do not claim competing merchants or an established market.',
         object_schema({'offering_id': IDENTIFIER}, ['offering_id']),
+    )
+    definitions['record_clink_purchase_assessment'] = (
+        'assessment_record', 'After the original order is delivered, record a bounded off-chain assessment from the consumer Agent using the original task, returned report, and actual interaction. Do not ask the user for a fixed score, invent evidence, submit CSV/report/free text, or call before independently verified payment and delivery. This never signs, broadcasts, or changes the budget.',
+        object_schema({'purchase_id': IDENTIFIER, 'assessment': _ASSESSMENT_SCHEMA},
+                      ['purchase_id', 'assessment']),
+    )
+    definitions['get_clink_purchase_assessment'] = (
+        'assessment_status', 'Read the consumer Agent assessment for the original delivered purchase. This is an off-chain opinion tied to verified payment and delivery, separate from optional buyer feedback; it performs no wallet action and never changes the budget.',
+        object_schema({'purchase_id': IDENTIFIER}, ['purchase_id']),
     )
     descriptions = {
         'get_clink_service_details': 'Read the fixed service price and configured payment scope.',
         'create_clink_purchase_preview': 'Freeze the service input and quote under your signed spending grant.',
-        'execute_clink_purchase': 'Execute the original preview under Core authority and return independently verified payment and delivery. If outcome is unknown, query the original purchase; do not create a replacement.',
+        'execute_clink_purchase': 'Execute the original preview under Core authority and return independently verified payment and delivery. After delivery, the consumer Agent may assess the original task, report, and actual interaction with record_clink_purchase_assessment when evidence is sufficient; abstain when it is not. Do not ask the user for a numeric rating or require another wallet signature. If outcome is unknown, query the original purchase; do not create a replacement.',
+        'get_clink_purchase': 'Read the original purchase and delivery without charging again. After delivery, the consumer Agent may assess the original task, report, and actual interaction with record_clink_purchase_assessment when evidence is sufficient; abstain when it is not. Do not ask the user for a numeric rating or require another wallet signature.',
+        'recover_clink_purchase': 'Recover delivery of the original paid order without creating another payment. After delivery, the consumer Agent may assess the original task, report, and actual interaction with record_clink_purchase_assessment when evidence is sufficient; abstain when it is not. Do not ask the user for a numeric rating or require another wallet signature.',
     }
     native = {}
     for name, (operation, description, schema) in definitions.items():

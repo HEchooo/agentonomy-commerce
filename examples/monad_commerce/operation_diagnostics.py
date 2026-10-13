@@ -35,6 +35,8 @@ SAFE_OPERATION_NAMES = frozenset({
     "feedback_prepare",
     "feedback_status",
     "feedback_verify",
+    "assessment_record",
+    "assessment_status",
     "service_history",
     "preview",
     "execute",
