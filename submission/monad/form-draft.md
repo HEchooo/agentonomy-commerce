@@ -127,8 +127,13 @@ execute for the same preview returned the same purchase, receipt, transaction
 and output without another charge. The final budget was used `0.30`, reserved
 `0.00`, remaining `0.70` TestUSD, and shared history contains one verified
 delivery. Optional buyer feedback was not submitted in this run and is not
-counted. Automatic Agent evaluation is a future direction and is not
-implemented in this release.
+counted. After deployment of `dec6e0a`, the consumer Agent recorded an
+off-chain assessment based on the task, independently checked report values,
+and actual recovery interaction. Exact replay and readback preserved one
+assessment, and a further purchase replay left the budget unchanged at
+`0.30 used / 0.70 remaining`. Shared history shows one verified delivery,
+one Agent assessment, and zero buyer feedback. The Agent opinion is explicitly
+not independently verified quality or on-chain buyer feedback.
 
 Remaining public acceptance is limited to fresh Core and on-chain revocation
 with a refused new purchase, second-wallet isolation, and the technical/pitch

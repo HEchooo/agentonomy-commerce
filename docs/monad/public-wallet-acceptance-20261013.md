@@ -33,7 +33,37 @@ recorded purchase.
 - Shared history: one verified delivery record
 - Optional buyer feedback: not submitted in this run and not counted in shared
   history
-- Automatic Agent evaluation: future direction; not implemented in this release
+- Consumer Agent assessment: one off-chain record, checked on the public MCP
+  endpoint after deployment of `dec6e0a82578c1dba2679ce226f9ff869066bb13`
+
+## Automatic consumer Agent assessment
+
+The consumer Agent independently checked the four synthetic input rows against
+the returned income, expense, net, category, and row-count values. These checks
+and the canonical output hash matched. The Agent assessed task fulfillment at
+100, result quality at 100, and interaction quality at 60: original-order
+reconciliation was needed before delivery completed, while replay did not
+charge again. The fixed 40/40/20 rubric produced **92**, with **medium**
+confidence because this is a small synthetic example.
+
+This is an Agent judgment, not an independently verified quality score. Its
+linked payment and delivery evidence are verified separately. No human score,
+wallet signature, transaction, or additional budget was required to record it.
+
+- Recorded at: `2026-10-13T14:02:41.113467Z`
+- Assessment hash:
+  `sha256:0f4aa72b8f7b8c63acf1c750c75d17d3356224f94f254b6a59c818f854d8c45d`
+- Exact assessment replay and readback returned the original record.
+- A further original-preview replay after deployment returned the same payment,
+  receipt, and output. Budget stayed at `0.30 used / 0.00 reserved / 0.70 remaining`;
+  relayer nonce stayed at `7`.
+- Final history observation at `2026-10-13T14:04:49.816206Z`: one verified
+  delivery, one Agent assessment, and zero buyer-feedback samples.
+- Public labels: `source=authenticated_consumer_agent`, `on_chain=false`,
+  `judgment_independently_verified=false`.
+
+The [assessment contract](agent-service-assessment.md) describes the rubric,
+privacy, source, and replay boundaries.
 
 ## Still pending
 
